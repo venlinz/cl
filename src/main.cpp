@@ -77,8 +77,7 @@ void print_usage(std::string program);
 void compile_program(std::string output_filename, std::list<Operation> operations_list);
 
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     if (argc < 1) {
         std::cerr << "ERROR: Invalid program name\n";
         print_usage("Invalid program name");
@@ -112,8 +111,7 @@ int main(int argc, char **argv)
 }
 
 
-std::list<Operation> parse_program(std::string program_file_name)
-{
+std::list<Operation> parse_program(std::string program_file_name) {
     std::ifstream input_program_file;
     input_program_file.open(program_file_name);
 
@@ -154,8 +152,7 @@ std::list<Operation> parse_program(std::string program_file_name)
 }
 
 
-size_t parse_op_from_line(Operations *op, std::string &line)
-{
+size_t parse_op_from_line(Operations *op, std::string &line) {
     if (line.empty())
         return 0;
     /* std::cerr << line << '\n'; */
@@ -200,8 +197,7 @@ size_t parse_op_from_line(Operations *op, std::string &line)
     return 0;
 }
 
-size_t strip_front_str(std::string &str)
-{
+size_t strip_front_str(std::string &str) {
     if (str.empty())
         return 0;
 
@@ -221,8 +217,7 @@ size_t strip_front_str(std::string &str)
 }
 
 
-void simulate_program(std::list<Operation> operations_list)
-{
+void simulate_program(std::list<Operation> operations_list) {
     std::cout << "Simulating\n";
     std::stack<uint64_t> program_stack;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
@@ -283,8 +278,7 @@ void simulate_program(std::list<Operation> operations_list)
 }
 
 
-void print_usage(std::string program)
-{
+void print_usage(std::string program) {
     std::cout << "Usage: " << program << " option file\n";
     std::cout << "    options:\n";
     std::cout << "        c - compile\n";
@@ -292,8 +286,7 @@ void print_usage(std::string program)
 }
 
 
-void compile_program(std::string output_filename, std::list<Operation> operations_list)
-{
+void compile_program(std::string output_filename, std::list<Operation> operations_list) {
     std::cout << "Compiling\n";
 
     int mock_stack_size = 0;
@@ -429,4 +422,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     out_file << "    ret\n";
 
     out_file.close();
+
+    pclose(popen("nasm -felf64 output.asm", "r"));
+    pclose(popen("ld -o output output.o", "r"));
 }
