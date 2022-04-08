@@ -1,2 +1,4 @@
 build/
 c++/
+cscope*
+tags
