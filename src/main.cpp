@@ -75,6 +75,7 @@ size_t strip_front_str(std::string &str);
 void simulate_program(std::list<Operation> operations_list);
 void print_usage(std::string program);
 void compile_program(std::string output_filename, std::list<Operation> operations_list);
+void exec(const std::string cmd);
 
 
 int main(int argc, char **argv) {
@@ -128,12 +129,10 @@ std::list<Operation> parse_program(std::string program_file_name) {
     for (std::string line; std::getline(input_program_file, line);)
     {
         ++line_num;
-        std::cout << line << '\n';
         Operations op_type;
         size_t rel_col = 0;
         size_t col = 1;
         while ((rel_col = parse_op_from_line(&op_type, line))) {
-            /* std::cerr << "op: " << op_type << "col: " << col << '\n' << '\n'; */
             if (op_type >= Operations::OP_CNT) {
                 std::cerr << "OP_CNT: " << line << '\n';
                 exit(EXIT_FAILURE);
@@ -155,7 +154,6 @@ std::list<Operation> parse_program(std::string program_file_name) {
 size_t parse_op_from_line(Operations *op, std::string &line) {
     if (line.empty())
         return 0;
-    /* std::cerr << line << '\n'; */
     size_t striped_front = strip_front_str(line);
 
     char number_str[128];
@@ -168,12 +166,10 @@ size_t parse_op_from_line(Operations *op, std::string &line) {
         }
         number_str[idx] = '\0';
         line.erase(0, idx);
-        /* std::cerr << number_str << '\n'; */
         *op = Operations::PUSH;
         opr_global = atoi(number_str);
 
 
-        /* std::cerr << "R: " << striped_front + idx << '\n'; */
         return striped_front + idx;
     }
 
@@ -396,8 +392,6 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                 break;
             case Operations::DUMP:
                 if (mock_stack_size >= 1) {
-                    /* std::cout << program_stack.top() << '\n'; */
-                    /* program_stack.pop(); */
                     out_file << "    ;; DUMP\n";
                     out_file << "    pop rdi\n";
                     out_file << "    call dump\n";
@@ -423,6 +417,21 @@ void compile_program(std::string output_filename, std::list<Operation> operation
 
     out_file.close();
 
-    pclose(popen("nasm -felf64 output.asm", "r"));
-    pclose(popen("ld -o output output.o", "r"));
+    std::string nasm_cmd = "nasm -felf64 ";
+    nasm_cmd += OUTPUT_FILENAME;
+    nasm_cmd += ".asm -o";
+    nasm_cmd += OUTPUT_FILENAME;
+    nasm_cmd += ".o";
+    exec(nasm_cmd);
+
+    std::string ld_cmd = "ld ";
+    ld_cmd += OUTPUT_FILENAME;
+    ld_cmd += ".o -o ./a.out";
+    exec(ld_cmd);
+}
+
+
+void exec(const std::string cmd) {
+    std::cout << "Exec: " << cmd << '\n';
+    std::system(cmd.c_str());
 }
