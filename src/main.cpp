@@ -1,4 +1,3 @@
-// Create MyString - inherit publically and add methods that I like ;) .
 #include <fstream>
 #include <iostream>
 #include <list>
