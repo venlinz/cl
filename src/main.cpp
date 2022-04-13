@@ -417,7 +417,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     }
 
     out_file << "    mov rax, 60\n";
-    out_file << "    mov rsi, 12\n";
+    out_file << "    mov rdi, 0\n";
     out_file << "    syscall\n";
     out_file << "    ret\n";
 
