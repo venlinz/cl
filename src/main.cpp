@@ -13,7 +13,6 @@
 #define MAX_STACK_SIZE 1024
 
 enum Operations {
-    OP_UNKNOWN,
     PUSH,
     PLUS,
     MINUS,
@@ -68,6 +67,7 @@ uint64_t opr_global = 0;
 
 #define STR_OPT_COMPILE "c"
 #define STR_OPT_SIMULATE "s"
+#define STR_OPT_HELP "help"
 
 #define OUTPUT_FILENAME "output"
 
@@ -76,16 +76,31 @@ size_t parse_op_from_line(Operations *op, std::string &line);
 size_t strip_front_str(std::string &str);
 void simulate_program(std::list<Operation> operations_list);
 void print_usage(std::string program);
+void print_help();
 void compile_program(std::string output_filename, std::list<Operation> operations_list);
 void exec(const std::string cmd);
 
 
 int main(int argc, char **argv) {
+
+    // sanity check for execl with 0 arg
     if (argc < 1) {
         std::cerr << "ERROR: Invalid program name\n";
-        print_usage("Invalid program name");
+        exit(EXIT_FAILURE);
     }
     std::string compiler_program_name = argv[0];
+
+    if (argc < 2) {
+        std::cerr << "ERROR: Invalid subcommand\n";
+        print_help();
+    }
+
+    // Subcommand
+    std::string opt_command = argv[1];
+    if (opt_command == STR_OPT_HELP) {
+        print_help();
+        exit(EXIT_SUCCESS);
+    }
 
     if (argc < 3) {
         std::cerr << "ERROR: Invalid number of arguments\n";
@@ -277,6 +292,11 @@ void simulate_program(std::list<Operation> operations_list) {
                 exit(EXIT_FAILURE);
         }
     }
+}
+
+
+void print_help() {
+    print_usage("cl");
 }
 
 
