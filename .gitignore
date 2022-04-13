@@ -4,3 +4,4 @@ cscope*
 tags
 output*
 a.out
+out/
