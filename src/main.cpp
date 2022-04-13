@@ -108,10 +108,10 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
 
+    // Two options: subcommand and file_path to compile
     std::string program_file_name = argv[2];
     std::list<Operation> operations = parse_program(program_file_name);
 
-    std::string opt_command = argv[1];
     if (opt_command == STR_OPT_COMPILE) {
         compile_program(OUTPUT_FILENAME, operations);
         exit(0);
@@ -129,7 +129,9 @@ int main(int argc, char **argv) {
 }
 
 
+// parse the program file into list<Operation>.
 std::list<Operation> parse_program(std::string program_file_name) {
+
     std::ifstream input_program_file;
     input_program_file.open(program_file_name);
 
@@ -150,12 +152,16 @@ std::list<Operation> parse_program(std::string program_file_name) {
         size_t rel_col = 0;
         size_t col = 1;
         while ((rel_col = parse_op_from_line(&op_type, line))) {
+
             if (op_type >= Operations::OP_CNT) {
-                std::cerr << "OP_CNT: " << line << '\n';
+                std::cerr << "ERROR: Invalid operation on" << line << '\n';
                 exit(EXIT_FAILURE);
             }
+
             Operation op = Operation(op_type, line_num, 0);
             if (op_type == Operations::PUSH) {
+                // uses a opr_global variable which is
+                // set by parse_op_from_line()
                 op.opr(opr_global);
                 col += rel_col;
             }
@@ -168,6 +174,8 @@ std::list<Operation> parse_program(std::string program_file_name) {
 }
 
 
+// Parses a single operation from a line and stores it
+// in the *op and consumes the operations from line.
 size_t parse_op_from_line(Operations *op, std::string &line) {
     if (line.empty())
         return 0;
@@ -184,8 +192,9 @@ size_t parse_op_from_line(Operations *op, std::string &line) {
         number_str[idx] = '\0';
         line.erase(0, idx);
         *op = Operations::PUSH;
+        // TODO: do not use global variables
+        // sets global variable to the push argument
         opr_global = atoi(number_str);
-
 
         return striped_front + idx;
     }
@@ -197,21 +206,27 @@ size_t parse_op_from_line(Operations *op, std::string &line) {
             *op = Operations::PLUS;
             line.erase(0, 1);
             return striped_front + 1;
+
         case '-':
             *op = Operations::MINUS;
             line.erase(0, 1);
             return striped_front + 1;
+
         case '.':
             *op = Operations::DUMP;
             line.erase(0, 1);
             return striped_front + 1;
+
         default:
             std::cerr << "Unhandled function: " << line.at(0);
-
+            exit(EXIT_SUCCESS);
     }
     return 0;
 }
 
+
+// strips spaces only from front of the string in place
+// and return removed no of spaces
 size_t strip_front_str(std::string &str) {
     if (str.empty())
         return 0;
@@ -235,10 +250,12 @@ size_t strip_front_str(std::string &str) {
 void simulate_program(std::list<Operation> operations_list) {
     std::cout << "Simulating\n";
     std::stack<uint64_t> program_stack;
+
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
     {
         // Check for whether implemented every operation in Operations
         assert(OPS_IMPLEMENTED == Operations::OP_CNT && "Implement every operation");
+
         switch (it->op()) {
             case Operations::PUSH:
                 if (program_stack.size() >= MAX_STACK_SIZE) {
@@ -247,6 +264,7 @@ void simulate_program(std::list<Operation> operations_list) {
                 }
                 program_stack.push(it->opr());
                 break;
+
             case Operations::PLUS:
                 if (program_stack.size() >= 2) {
                     int a = program_stack.top();
@@ -261,6 +279,7 @@ void simulate_program(std::list<Operation> operations_list) {
                     exit(EXIT_FAILURE);
                 }
                 break;
+
             case Operations::MINUS:
                 if (program_stack.size() >= 2) {
                     int a = program_stack.top();
@@ -275,6 +294,7 @@ void simulate_program(std::list<Operation> operations_list) {
                     exit(EXIT_FAILURE);
                 }
                 break;
+
             case Operations::DUMP:
                 if (program_stack.size() >= 1) {
                     std::cout << program_stack.top() << '\n';
@@ -286,6 +306,7 @@ void simulate_program(std::list<Operation> operations_list) {
                     exit(EXIT_FAILURE);
                 }
                 break;
+
             default:
                 std::cerr << "ERROR: Operation unknown\n";
                 std::cerr << "op: " << it->op() << '\n';
@@ -308,6 +329,8 @@ void print_usage(std::string program) {
 }
 
 
+// Compiles the program and creates executable ./a.out and generated assembly
+// file %output_filename%.asm and relocatable %output_filename%.o
 void compile_program(std::string output_filename, std::list<Operation> operations_list) {
     std::cout << "Compiling\n";
 
@@ -319,6 +342,8 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     out_file << "global _start\n";
     out_file << "segment .text\n";
 
+    // Created using a C program to print a number
+    // with a new line
     out_file << "dump:\n";
     out_file << "    push    rbp\n";
     out_file << "    mov     rbp, rsp\n";
@@ -372,6 +397,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     out_file << "    leave\n";
     out_file << "    ret\n";
 
+
     out_file << "_start:\n";
 
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
@@ -386,6 +412,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                 out_file << "    push " << it->opr() << '\n';
                 ++mock_stack_size;
                 break;
+
             case Operations::PLUS:
                 if (mock_stack_size >= 2) {
                     out_file << "    ;; ADD\n";
@@ -401,6 +428,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                     exit(EXIT_FAILURE);
                 }
                 break;
+
             case Operations::MINUS:
                 if (mock_stack_size >= 2) {
                     out_file << "    ;; MINUS\n";
@@ -416,6 +444,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                     exit(EXIT_FAILURE);
                 }
                 break;
+
             case Operations::DUMP:
                 if (mock_stack_size >= 1) {
                     out_file << "    ;; DUMP\n";
@@ -429,6 +458,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                     exit(EXIT_FAILURE);
                 }
                 break;
+
             default:
                 std::cerr << "ERROR: Operation unknown\n";
                 std::cerr << "op: " << it->op() << '\n';
@@ -436,6 +466,8 @@ void compile_program(std::string output_filename, std::list<Operation> operation
         }
     }
 
+    // Returning zero
+    out_file << "    ;; returning from function with zero exit code\n";
     out_file << "    mov rax, 60\n";
     out_file << "    mov rdi, 0\n";
     out_file << "    syscall\n";
@@ -443,6 +475,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
 
     out_file.close();
 
+    // Creating relocatable object
     std::string nasm_cmd = "nasm -felf64 ";
     nasm_cmd += OUTPUT_FILENAME;
     nasm_cmd += ".asm -o";
@@ -450,6 +483,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     nasm_cmd += ".o";
     exec(nasm_cmd);
 
+    // Creating executable
     std::string ld_cmd = "ld ";
     ld_cmd += OUTPUT_FILENAME;
     ld_cmd += ".o -o ./a.out";
@@ -457,6 +491,8 @@ void compile_program(std::string output_filename, std::list<Operation> operation
 }
 
 
+// Helper funtion for echoing the command being
+// executed.
 void exec(const std::string cmd) {
     std::cout << "Exec: " << cmd << '\n';
     std::system(cmd.c_str());
