@@ -21,6 +21,9 @@ enum Operations {
     OP_CNT,
 };
 
+#define OPS_IMPLEMENTED 4
+
+
 class Operation {
     private:
         Operations m_op;
@@ -172,6 +175,8 @@ size_t parse_op_from_line(Operations *op, std::string &line) {
         return striped_front + idx;
     }
 
+    // Check for whether implemented every operation in Operations
+    assert(OPS_IMPLEMENTED == Operations::OP_CNT && "Implement every operation");
     switch (line.at(0)) {
         case '+':
             *op = Operations::PLUS;
@@ -217,6 +222,8 @@ void simulate_program(std::list<Operation> operations_list) {
     std::stack<uint64_t> program_stack;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
     {
+        // Check for whether implemented every operation in Operations
+        assert(OPS_IMPLEMENTED == Operations::OP_CNT && "Implement every operation");
         switch (it->op()) {
             case Operations::PUSH:
                 if (program_stack.size() >= MAX_STACK_SIZE) {
