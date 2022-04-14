@@ -26,13 +26,14 @@ enum Operations {
 class Operation {
     private:
         Operations m_op;
-        int m_opr;
+        uint64_t m_opr;
         int m_line;
         int m_col;
 
     public:
-        Operation(Operations op, int line_no, int col_no)
-            : m_op(op), m_line(line_no), m_col(col_no)
+        Operation() {};
+        Operation(Operations op_type, int line_no, int col_no)
+            : m_op(op_type), m_line(line_no), m_col(col_no)
         { }
         int line() const {
             return m_line;
@@ -41,11 +42,11 @@ class Operation {
             m_line = line;
         }
 
-        Operations op() const {
+        Operations op_type() const {
             return m_op;
         }
-        void op(Operations op) {
-            m_op = op;
+        void op_type(Operations op_type) {
+            m_op = op_type;
         }
 
         int col() const {
@@ -55,11 +56,11 @@ class Operation {
             m_col = col;
         }
 
-        int opr() const {
+        uint64_t operand() const {
             return m_opr;
         }
-        void opr(int opr) {
-            m_opr = opr;
+        void operand(uint64_t operand) {
+            m_opr = operand;
         }
 };
 
@@ -256,20 +257,20 @@ void simulate_program(std::list<Operation> operations_list) {
         // Check for whether implemented every operation in Operations
         assert(OPS_IMPLEMENTED == Operations::OP_CNT && "Implement every operation");
 
-        switch (it->op()) {
+        switch (it->op_type()) {
             case Operations::PUSH:
                 if (program_stack.size() >= MAX_STACK_SIZE) {
                     std::cerr << "Stack size exceeded limit\n";
                     exit(EXIT_FAILURE);
                 }
-                program_stack.push(it->opr());
+                program_stack.push(it->operand());
                 break;
 
             case Operations::PLUS:
                 if (program_stack.size() >= 2) {
-                    int a = program_stack.top();
+                    uint64_t a = program_stack.top();
                     program_stack.pop();
-                    int b = program_stack.top();
+                    uint64_t b = program_stack.top();
                     program_stack.pop();
                     program_stack.push(a + b);
                 }
@@ -282,9 +283,9 @@ void simulate_program(std::list<Operation> operations_list) {
 
             case Operations::MINUS:
                 if (program_stack.size() >= 2) {
-                    int a = program_stack.top();
+                    uint64_t a = program_stack.top();
                     program_stack.pop();
-                    int b = program_stack.top();
+                    uint64_t b = program_stack.top();
                     program_stack.pop();
                     program_stack.push(b - a);
                 }
@@ -309,7 +310,7 @@ void simulate_program(std::list<Operation> operations_list) {
 
             default:
                 std::cerr << "ERROR: Operation unknown\n";
-                std::cerr << "op: " << it->op() << '\n';
+                std::cerr << "op_type: " << it->op_type() << '\n';
                 exit(EXIT_FAILURE);
         }
     }
@@ -402,14 +403,14 @@ void compile_program(std::string output_filename, std::list<Operation> operation
 
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
     {
-        switch (it->op()) {
+        switch (it->op_type()) {
             case Operations::PUSH:
                 if (mock_stack_size >= MAX_STACK_SIZE) {
                     std::cerr << "Stack size exceeded limit\n";
                     exit(EXIT_FAILURE);
                 }
                 out_file << "    ;; PUSH\n";
-                out_file << "    push " << it->opr() << '\n';
+                out_file << "    push " << it->operand() << '\n';
                 ++mock_stack_size;
                 break;
 
@@ -461,7 +462,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
 
             default:
                 std::cerr << "ERROR: Operation unknown\n";
-                std::cerr << "op: " << it->op() << '\n';
+                std::cerr << "op_type: " << it->op_type() << '\n';
                 exit(EXIT_FAILURE);
         }
     }

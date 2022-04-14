@@ -3,4 +3,6 @@ cmake_minimum_required(VERSION 3.2)
 project(cl VERSION 0.1
     LANGUAGES CXX)
 
+add_compile_options(-Wall -Wextra -pedantic -Werror
+    -pedantic-errors -Wconversion -Wshadow)
 add_executable(cl main.cpp)
