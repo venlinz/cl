@@ -64,7 +64,6 @@ class Operation {
         }
 };
 
-uint64_t opr_global = 0;
 
 #define STR_OPT_COMPILE "c"
 #define STR_OPT_SIMULATE "s"
@@ -73,8 +72,8 @@ uint64_t opr_global = 0;
 #define OUTPUT_FILENAME "output"
 
 std::list<Operation> parse_program(std::string program_file_name);
-size_t parse_op_from_line(Operations *op, std::string &line);
-size_t strip_front_str(std::string &str);
+std::list<Operation> parse_op_from_line(std::string line);
+size_t lstrip(std::string &str);
 void simulate_program(std::list<Operation> operations_list);
 void print_usage(std::string program);
 void print_help();
@@ -133,6 +132,7 @@ int main(int argc, char **argv) {
 // parse the program file into list<Operation>.
 std::list<Operation> parse_program(std::string program_file_name) {
 
+    int exit_code = EXIT_SUCCESS;
     std::ifstream input_program_file;
     input_program_file.open(program_file_name);
 
@@ -142,93 +142,95 @@ std::list<Operation> parse_program(std::string program_file_name) {
         exit(EXIT_FAILURE);
     }
 
-    char op[MAX_KEYWORD_LEN];
 
     std::list<Operation> operations_list;
     int line_num = 0;
     for (std::string line; std::getline(input_program_file, line);)
     {
         ++line_num;
-        Operations op_type;
-        size_t rel_col = 0;
-        size_t col = 1;
-        while ((rel_col = parse_op_from_line(&op_type, line))) {
-
-            if (op_type >= Operations::OP_CNT) {
-                std::cerr << "ERROR: Invalid operation on" << line << '\n';
-                exit(EXIT_FAILURE);
-            }
-
-            Operation op = Operation(op_type, line_num, 0);
-            if (op_type == Operations::PUSH) {
-                // uses a opr_global variable which is
-                // set by parse_op_from_line()
-                op.opr(opr_global);
-                col += rel_col;
-            }
-            operations_list.push_back(op);
+        // TODO: change this to lamda expressions for error reporting.
+        std::list<Operation> ops_in_line = parse_op_from_line(line);
+        if (ops_in_line.empty()) {
+            continue;
         }
+        for (auto op = ops_in_line.begin();
+                op != ops_in_line.end();
+                ++op) {
+            if (op->op_type() >= Operations::OP_CNT) {
+                exit_code = EXIT_FAILURE;
+                std::cerr << program_file_name << ':' << line_num << ':'
+                    << op->col() << ": ERROR: Invalid operation\n";
+            }
+        }
+        operations_list.splice(operations_list.end(), ops_in_line);
     }
     input_program_file.close();
+
+    if (exit_code != EXIT_SUCCESS) {
+        exit(EXIT_FAILURE);
+    }
 
     return operations_list;
 }
 
 
-// Parses a single operation from a line and stores it
-// in the *op and consumes the operations from line.
-size_t parse_op_from_line(Operations *op, std::string &line) {
-    if (line.empty())
-        return 0;
-    size_t striped_front = strip_front_str(line);
+// TODO: change this function to return nullptr or list
+// parse_op_from_line return list of Operations in a line
+// and return empty list if no Operations is on line.
+std::list<Operation> parse_op_from_line(std::string line) {
+    if (line.empty()) {
+        return std::list<Operation> {};
+    }
 
-    char number_str[128];
-    bool is_number = false;
-    size_t idx = 0;
-    if (isdigit(line.at(0))) {
-        for (size_t i = 0; i < line.size() && isdigit(line.at(i)); ++i) {
-            number_str[idx] = line.at(i);
-            ++idx;
+    std::list<Operation> line_ops = {};
+    char number_str[32] = {0};
+    for (uint32_t i = 0; i < line.size(); ++i) {
+
+        Operation op;
+        if (isdigit(line.at(i))) {
+            int col_start = i + 1;
+            int num_idx = 0;
+            for (; isdigit(line.at(i)) && i < line.size(); ++i) {
+                number_str[num_idx] = line.at(i);
+                ++num_idx;
+            }
+            number_str[num_idx] = '\0';
+            op.operand(atoi(number_str));
+            op.op_type(Operations::PUSH);
+            op.col(col_start);
+            line_ops.push_back(op);
         }
-        number_str[idx] = '\0';
-        line.erase(0, idx);
-        *op = Operations::PUSH;
-        // TODO: do not use global variables
-        // sets global variable to the push argument
-        opr_global = atoi(number_str);
 
-        return striped_front + idx;
+        if (isspace(line.at(i))) {
+            continue;
+        }
+
+        // Check for whether implemented every operation in Operations
+        assert(OPS_IMPLEMENTED == Operations::OP_CNT && "Implement every operation");
+        int col_start = i + 1;
+        switch (line.at(i)) {
+            case '+':
+                op.op_type(Operations::PLUS);
+                break;
+            case '-':
+                op.op_type(Operations::MINUS);
+                break;
+            case '.':
+                op.op_type(Operations::DUMP);
+                break;
+            default:
+                op.op_type(Operations::OP_CNT);
+        }
+        op.col(col_start);
+        line_ops.push_back(op);
     }
-
-    // Check for whether implemented every operation in Operations
-    assert(OPS_IMPLEMENTED == Operations::OP_CNT && "Implement every operation");
-    switch (line.at(0)) {
-        case '+':
-            *op = Operations::PLUS;
-            line.erase(0, 1);
-            return striped_front + 1;
-
-        case '-':
-            *op = Operations::MINUS;
-            line.erase(0, 1);
-            return striped_front + 1;
-
-        case '.':
-            *op = Operations::DUMP;
-            line.erase(0, 1);
-            return striped_front + 1;
-
-        default:
-            std::cerr << "Unhandled function: " << line.at(0);
-            exit(EXIT_SUCCESS);
-    }
-    return 0;
+    return line_ops;
 }
 
 
-// strips spaces only from front of the string in place
+// strips spaces only from left of the string in place
 // and return removed no of spaces
-size_t strip_front_str(std::string &str) {
+size_t lstrip(std::string &str) {
     if (str.empty())
         return 0;
 
