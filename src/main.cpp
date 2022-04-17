@@ -5,12 +5,15 @@
 #include <string>
 
 #include <cassert>
-#include <cstdlib>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 
 #define MAX_KEYWORD_LEN 32
 #define TEST_PROGRAM "./examples/test.cl"
 #define MAX_STACK_SIZE 1024
+
+#define STR_KEYWRD_END "end"
 
 enum Operations {
     OP_PUSH,
@@ -18,6 +21,8 @@ enum Operations {
     OP_MINUS,
     OP_DUMP,
     OP_EQUAL,
+    OP_IF,
+    OP_END,
     OP_CNT,
 };
 
@@ -222,7 +227,31 @@ int main(int argc, char **argv) {
             case '=':
                 op.op_type(Operations::OP_EQUAL);
                 break;
+            case 'i':
+                if (line.at(i + 1) == 'f') {
+                    op.op_type(Operations::OP_IF);
+                }
+                else {
+                    op.op_type(Operations::OP_CNT);
+                }
+                ++i;
+                break;
+            case 'e':
+                /* std::cerr << "size: " << i << '\n'; */
+                /* std::cerr << "cstr: " << (line.c_str()) << '\n'; */
+                if (strncmp(line.c_str() + i, STR_KEYWRD_END,
+                        strlen(STR_KEYWRD_END)) == 0) {
+                    op.op_type(Operations::OP_END);
+                    /* std::cerr << "Works\n"; */
+                    i += strlen(STR_KEYWRD_END);
+                }
+                else {
+                    op.op_type(Operations::OP_CNT);
+                }
+                break;
+
             default:
+                std::cerr << line.at(i) << '\n';
                 op.op_type(Operations::OP_CNT);
         }
         op.col(col_start);
@@ -258,10 +287,17 @@ void simulate_program(std::list<Operation> operations_list) {
     std::cout << "Simulating\n";
     std::stack<uint64_t> program_stack;
 
+    bool SKIP_IF_BODY = false;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
     {
         // Check for whether implemented every operation in Operations
         assert(7 == Operations::OP_CNT && "Implement every operation");
+
+        if (it->op_type() == OP_END) {
+                SKIP_IF_BODY = false;
+        }
+        if (SKIP_IF_BODY)
+            continue;
 
         switch (it->op_type()) {
             case Operations::OP_PUSH:
@@ -328,6 +364,28 @@ void simulate_program(std::list<Operation> operations_list) {
 
                     program_stack.push(a == b);
                 }
+                break;
+
+            case Operations::OP_IF:
+                if (program_stack.size() < 1) {
+                    std::cout << "ERROR: Not enough elements in stack for "
+                        << "OP_IF operation\n";
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    // if statement will not consume the bool_result
+                    uint64_t bool_result = program_stack.top();
+                    if (bool_result == 0) {
+                        SKIP_IF_BODY = true;
+                    }
+                    else {
+                        SKIP_IF_BODY = false;
+                    }
+                }
+                break;
+
+            case Operations::OP_END:
+                // This Operation is handled outside the switch case.
                 break;
 
             default:
@@ -425,6 +483,9 @@ void compile_program(std::string output_filename, std::list<Operation> operation
 
     // Check for whether implemented every operation in Operations
     assert(7 == Operations::OP_CNT && "Implement every operation");
+    uint64_t branch_counter = 0;
+    uint64_t ip = 0;
+    for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
     {
         switch (it->op_type()) {
             case Operations::OP_PUSH:
@@ -501,6 +562,26 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                         << "OP_EQUAL(-) operation\n";
                     exit(EXIT_FAILURE);
                 }
+                break;
+
+            case Operations::OP_IF:
+                if (mock_stack_size < 1) {
+                    std::cout << "ERROR: Not enough elements in stack for "
+                        << "OP_IF operation\n";
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    // if statement will not consume the bool_result
+                    /* uint64_t bool_result = program_stack.top(); */
+                    out_file << "    ;; OP_IF\n";
+                    out_file << "    pop rax\n";
+                    out_file << "    test rax, rax\n";
+                    out_file << "    je branch" << ip << "\n";
+                    branch_counter = ip;
+                }
+                break;
+            case Operations::OP_END:
+                out_file << "branch" << branch_counter << ":\n";
                 break;
 
             default:
