@@ -72,9 +72,9 @@ class Operation {
 
 #define OUTPUT_FILENAME "output"
 
-std::list<Operation> parse_program(std::string program_file_name);
-std::list<Operation> parse_op_from_line(std::string line);
-size_t lstrip(std::string &str);
+[[nodiscard]] std::list<Operation> parse_program(std::string program_file_name);
+[[nodiscard]] std::list<Operation> parse_op_from_line(std::string line);
+[[maybe_unused]] size_t lstrip(std::string &str);
 void simulate_program(std::list<Operation> operations_list);
 void print_usage(std::string program);
 void print_help();
@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
 
 
 // parse the program file into list<Operation>.
-std::list<Operation> parse_program(std::string program_file_name) {
+[[nodiscard]] std::list<Operation> parse_program(std::string program_file_name) {
 
     int exit_code = EXIT_SUCCESS;
     std::ifstream input_program_file;
@@ -175,10 +175,10 @@ std::list<Operation> parse_program(std::string program_file_name) {
 }
 
 
-// TODO: change this function to return nullptr or list
+// TODO: change this function to return Option like in rust
 // parse_op_from_line return list of Operations in a line
 // and return empty list if no Operations is on line.
-std::list<Operation> parse_op_from_line(std::string line) {
+[[nodiscard]] std::list<Operation> parse_op_from_line(std::string line) {
     if (line.empty()) {
         return std::list<Operation> {};
     }
@@ -207,7 +207,7 @@ std::list<Operation> parse_op_from_line(std::string line) {
         }
 
         // Check for whether implemented every operation in Operations
-        static_assert(5 == Operations::OP_CNT && "Implement every operation");
+        assert(7 == Operations::OP_CNT && "Implement every operation");
         int col_start = i + 1;
         switch (line.at(i)) {
             case '+':
@@ -234,7 +234,7 @@ std::list<Operation> parse_op_from_line(std::string line) {
 
 // strips spaces only from left of the string in place
 // and return removed no of spaces
-size_t lstrip(std::string &str) {
+[[maybe_unused]] size_t lstrip(std::string &str) {
     if (str.empty())
         return 0;
 
@@ -261,7 +261,7 @@ void simulate_program(std::list<Operation> operations_list) {
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
     {
         // Check for whether implemented every operation in Operations
-        static_assert(5 == Operations::OP_CNT && "Implement every operation");
+        assert(7 == Operations::OP_CNT && "Implement every operation");
 
         switch (it->op_type()) {
             case Operations::OP_PUSH:
@@ -313,6 +313,7 @@ void simulate_program(std::list<Operation> operations_list) {
                     program_stack.pop();
                 }
                 break;
+
             case Operations::OP_EQUAL:
                 if (program_stack.size() < 2) {
                     std::cout << "ERROR: Not enough elements in stack for "
@@ -423,8 +424,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     out_file << "_start:\n";
 
     // Check for whether implemented every operation in Operations
-    static_assert(5 == Operations::OP_CNT && "Implement every operation");
-    for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
+    assert(7 == Operations::OP_CNT && "Implement every operation");
     {
         switch (it->op_type()) {
             case Operations::OP_PUSH:
@@ -504,8 +504,8 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                 break;
 
             default:
+                std::cerr << "Compilation failed!\n";
                 std::cerr << "ERROR: Operation unknown\n";
-                std::cerr << "op_type: " << it->op_type() << '\n';
                 exit(EXIT_FAILURE);
         }
     }
@@ -539,5 +539,8 @@ void compile_program(std::string output_filename, std::list<Operation> operation
 // executed.
 void exec(const std::string cmd) {
     std::cout << "Exec: " << cmd << '\n';
-    std::system(cmd.c_str());
+    if (std::system(cmd.c_str()) != 0) {
+        std::cerr << "ERROR: Failed executing " << cmd << '\n';
+        exit(EXIT_FAILURE);
+    }
 }
