@@ -13,10 +13,12 @@
 #define MAX_STACK_SIZE 1024
 
 enum Operations {
-    PUSH,
-    PLUS,
-    MINUS,
-    DUMP,
+    OP_PUSH,
+    OP_PLUS,
+    OP_MINUS,
+    OP_DUMP,
+    OP_EQUAL,
+    OP_IF,
     OP_CNT,
 };
 
@@ -196,7 +198,7 @@ std::list<Operation> parse_op_from_line(std::string line) {
             }
             number_str[num_idx] = '\0';
             op.operand(atoi(number_str));
-            op.op_type(Operations::PUSH);
+            op.op_type(Operations::OP_PUSH);
             op.col(col_start);
             line_ops.push_back(op);
         }
@@ -206,17 +208,20 @@ std::list<Operation> parse_op_from_line(std::string line) {
         }
 
         // Check for whether implemented every operation in Operations
-        assert(OPS_IMPLEMENTED == Operations::OP_CNT && "Implement every operation");
+        static_assert(5 == Operations::OP_CNT && "Implement every operation");
         int col_start = i + 1;
         switch (line.at(i)) {
             case '+':
-                op.op_type(Operations::PLUS);
+                op.op_type(Operations::OP_PLUS);
                 break;
             case '-':
-                op.op_type(Operations::MINUS);
+                op.op_type(Operations::OP_MINUS);
                 break;
             case '.':
-                op.op_type(Operations::DUMP);
+                op.op_type(Operations::OP_DUMP);
+                break;
+            case '=':
+                op.op_type(Operations::OP_EQUAL);
                 break;
             default:
                 op.op_type(Operations::OP_CNT);
@@ -260,7 +265,7 @@ void simulate_program(std::list<Operation> operations_list) {
         assert(OPS_IMPLEMENTED == Operations::OP_CNT && "Implement every operation");
 
         switch (it->op_type()) {
-            case Operations::PUSH:
+            case Operations::OP_PUSH:
                 if (program_stack.size() >= MAX_STACK_SIZE) {
                     std::cerr << "Stack size exceeded limit\n";
                     exit(EXIT_FAILURE);
@@ -268,7 +273,7 @@ void simulate_program(std::list<Operation> operations_list) {
                 program_stack.push(it->operand());
                 break;
 
-            case Operations::PLUS:
+            case Operations::OP_PLUS:
                 if (program_stack.size() >= 2) {
                     uint64_t a = program_stack.top();
                     program_stack.pop();
@@ -278,12 +283,12 @@ void simulate_program(std::list<Operation> operations_list) {
                 }
                 else {
                     std::cerr << "ERROR: Not enough elements in stack for "
-                        << "PLUS(+) operation\n";
+                        << "OP_PLUS(+) operation\n";
                     exit(EXIT_FAILURE);
                 }
                 break;
 
-            case Operations::MINUS:
+            case Operations::OP_MINUS:
                 if (program_stack.size() >= 2) {
                     uint64_t a = program_stack.top();
                     program_stack.pop();
@@ -293,20 +298,35 @@ void simulate_program(std::list<Operation> operations_list) {
                 }
                 else {
                     std::cerr << "ERROR: Not enough elements in stack for "
-                        << "MINUS(-) operation\n";
+                        << "OP_MINUS(-) operation\n";
                     exit(EXIT_FAILURE);
                 }
                 break;
 
-            case Operations::DUMP:
-                if (program_stack.size() >= 1) {
+            case Operations::OP_DUMP:
+                if (program_stack.size() < 1) {
+                    std::cerr << "ERROR: Not enough elements in stack for "
+                        << "OP_DUMP operation\n";
+                    exit(EXIT_FAILURE);
+                }
+                else {
                     std::cout << program_stack.top() << '\n';
                     program_stack.pop();
                 }
-                else {
-                    std::cerr << "ERROR: Not enough elements in stack for "
-                        << "DUMP operation\n";
+                break;
+            case Operations::OP_EQUAL:
+                if (program_stack.size() < 2) {
+                    std::cout << "ERROR: Not enough elements in stack for "
+                        << "OP_EQUAL operation\n";
                     exit(EXIT_FAILURE);
+                }
+                else {
+                    uint64_t a = program_stack.top();
+                    program_stack.pop();
+                    uint64_t b = program_stack.top();
+                    program_stack.pop();
+
+                    program_stack.push(a == b);
                 }
                 break;
 
@@ -403,20 +423,22 @@ void compile_program(std::string output_filename, std::list<Operation> operation
 
     out_file << "_start:\n";
 
+    // Check for whether implemented every operation in Operations
+    static_assert(5 == Operations::OP_CNT && "Implement every operation");
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
     {
         switch (it->op_type()) {
-            case Operations::PUSH:
+            case Operations::OP_PUSH:
                 if (mock_stack_size >= MAX_STACK_SIZE) {
                     std::cerr << "Stack size exceeded limit\n";
                     exit(EXIT_FAILURE);
                 }
-                out_file << "    ;; PUSH\n";
+                out_file << "    ;; OP_PUSH\n";
                 out_file << "    push " << it->operand() << '\n';
                 ++mock_stack_size;
                 break;
 
-            case Operations::PLUS:
+            case Operations::OP_PLUS:
                 if (mock_stack_size >= 2) {
                     out_file << "    ;; ADD\n";
                     out_file << "    pop rdx\n";
@@ -427,14 +449,14 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                 }
                 else {
                     std::cerr << "ERROR: Not enough elements in stack for "
-                        << "PLUS(+) operation\n";
+                        << "OP_PLUS(+) operation\n";
                     exit(EXIT_FAILURE);
                 }
                 break;
 
-            case Operations::MINUS:
+            case Operations::OP_MINUS:
                 if (mock_stack_size >= 2) {
-                    out_file << "    ;; MINUS\n";
+                    out_file << "    ;; OP_MINUS\n";
                     out_file << "    pop rdx\n";
                     out_file << "    pop rsi\n";
                     out_file << "    sub rsi, rdx\n";
@@ -443,21 +465,25 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                 }
                 else {
                     std::cerr << "ERROR: Not enough elements in stack for "
-                        << "MINUS(-) operation\n";
+                        << "OP_MINUS(-) operation\n";
                     exit(EXIT_FAILURE);
                 }
                 break;
 
-            case Operations::DUMP:
+            case Operations::OP_DUMP:
                 if (mock_stack_size >= 1) {
-                    out_file << "    ;; DUMP\n";
+                    out_file << "    ;; OP_DUMP\n";
                     out_file << "    pop rdi\n";
                     out_file << "    call dump\n";
                     --mock_stack_size;
                 }
                 else {
                     std::cerr << "ERROR: Not enough elements in stack for "
-                        << "DUMP operation\n";
+                        << "OP_DUMP operation\n";
+                    exit(EXIT_FAILURE);
+                }
+                break;
+
                     exit(EXIT_FAILURE);
                 }
                 break;
