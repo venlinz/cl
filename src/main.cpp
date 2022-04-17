@@ -18,7 +18,6 @@ enum Operations {
     OP_MINUS,
     OP_DUMP,
     OP_EQUAL,
-    OP_IF,
     OP_CNT,
 };
 
@@ -262,7 +261,7 @@ void simulate_program(std::list<Operation> operations_list) {
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
     {
         // Check for whether implemented every operation in Operations
-        assert(OPS_IMPLEMENTED == Operations::OP_CNT && "Implement every operation");
+        static_assert(5 == Operations::OP_CNT && "Implement every operation");
 
         switch (it->op_type()) {
             case Operations::OP_PUSH:
@@ -484,6 +483,22 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                 }
                 break;
 
+            case Operations::OP_EQUAL:
+                if (mock_stack_size >= 2) {
+                    out_file << "    ;; OP_EQUAL\n";
+                    out_file << "    pop rax\n";
+                    out_file << "    pop rbx\n";
+
+                    out_file << "    mov rcx, 0\n";
+                    out_file << "    mov rdx, 1\n";
+                    out_file << "    cmp rax, rbx\n";
+                    out_file << "    cmove rcx, rdx\n";
+                    out_file << "    push rcx\n";
+                    --mock_stack_size;
+                }
+                else {
+                    std::cerr << "ERROR: Not enough elements in stack for "
+                        << "OP_EQUAL(-) operation\n";
                     exit(EXIT_FAILURE);
                 }
                 break;
