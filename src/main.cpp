@@ -503,7 +503,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     out_file << "_start:\n";
 
     // Check for whether implemented every operation in Operations
-    assert(7 == Operations::OP_CNT && "Implement every operation");
+    assert(8 == Operations::OP_CNT && "Implement every operation");
     uint64_t branch_counter = 0;
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
@@ -597,12 +597,17 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                     out_file << "    ;; OP_IF\n";
                     out_file << "    pop rax\n";
                     out_file << "    test rax, rax\n";
-                    out_file << "    je branch" << ip << "\n";
+                    out_file << "    je branch" << ip << "else\n";
                     branch_counter = ip;
                 }
                 break;
             case Operations::OP_END:
                 out_file << "branch" << branch_counter << ":\n";
+                break;
+
+            case Operations::OP_ELSE:
+                out_file << "    jmp branch" << branch_counter << "\n";
+                out_file << "branch" << branch_counter << "else:\n";
                 break;
 
             default:
