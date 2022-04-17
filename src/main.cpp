@@ -13,7 +13,8 @@
 #define TEST_PROGRAM "./examples/test.cl"
 #define MAX_STACK_SIZE 1024
 
-#define STR_KEYWRD_END "end"
+#define STR_KEYWORD_END "end"
+#define STR_KEYWORD_ELSE "else"
 
 enum Operations {
     OP_PUSH,
@@ -22,8 +23,9 @@ enum Operations {
     OP_DUMP,
     OP_EQUAL,
     OP_IF,
+    OP_ELSE,
     OP_END,
-    OP_CNT,
+    OP_CNT, // This value is treated as UNKNOWN OPERATION
 };
 
 #define OPS_IMPLEMENTED 4
@@ -212,7 +214,7 @@ int main(int argc, char **argv) {
         }
 
         // Check for whether implemented every operation in Operations
-        assert(7 == Operations::OP_CNT && "Implement every operation");
+        assert(8 == Operations::OP_CNT && "Implement every operation");
         int col_start = i + 1;
         switch (line.at(i)) {
             case '+':
@@ -237,13 +239,15 @@ int main(int argc, char **argv) {
                 ++i;
                 break;
             case 'e':
-                /* std::cerr << "size: " << i << '\n'; */
-                /* std::cerr << "cstr: " << (line.c_str()) << '\n'; */
-                if (strncmp(line.c_str() + i, STR_KEYWRD_END,
-                        strlen(STR_KEYWRD_END)) == 0) {
+                if (line.compare(i, strlen(STR_KEYWORD_END),
+                            STR_KEYWORD_END) == 0) {
                     op.op_type(Operations::OP_END);
-                    /* std::cerr << "Works\n"; */
-                    i += strlen(STR_KEYWRD_END);
+                    i += strlen(STR_KEYWORD_END);
+                }
+                else if (line.compare(i, strlen(STR_KEYWORD_ELSE),
+                            STR_KEYWORD_ELSE) == 0) {
+                    op.op_type(Operations::OP_ELSE);
+                    i += strlen(STR_KEYWORD_ELSE);
                 }
                 else {
                     op.op_type(Operations::OP_CNT);
@@ -288,16 +292,27 @@ void simulate_program(std::list<Operation> operations_list) {
     std::stack<uint64_t> program_stack;
 
     bool SKIP_IF_BODY = false;
+    bool SKIP_ELSE_BODY = false;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
     {
         // Check for whether implemented every operation in Operations
-        assert(7 == Operations::OP_CNT && "Implement every operation");
+        assert(8 == Operations::OP_CNT && "Implement every operation");
 
         if (it->op_type() == OP_END) {
-                SKIP_IF_BODY = false;
+            SKIP_IF_BODY = false;
+            SKIP_ELSE_BODY = false;
         }
-        if (SKIP_IF_BODY)
+
+        if (SKIP_ELSE_BODY) {
             continue;
+        }
+
+        if (SKIP_IF_BODY) {
+            if (it->op_type() == OP_ELSE) {
+                SKIP_IF_BODY = false;
+            }
+            continue;
+        }
 
         switch (it->op_type()) {
             case Operations::OP_PUSH:
@@ -386,6 +401,12 @@ void simulate_program(std::list<Operation> operations_list) {
 
             case Operations::OP_END:
                 // This Operation is handled outside the switch case.
+                break;
+
+            case Operations::OP_ELSE:
+                if (!SKIP_IF_BODY) {
+                    SKIP_ELSE_BODY = true;
+                }
                 break;
 
             default:
