@@ -94,6 +94,7 @@ int generate_asm_for_if_else(std::ofstream& out_file,
         uint64_t ip);
 void print_error(const std::string& program_file_name, const int line_num,
         const int col, const std::string msg);
+void add_boilerplate_asm(std::ofstream& out_file);
 
 
 int main(int argc, char **argv) {
@@ -448,66 +449,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     std::ofstream out_file;
     out_file.open(output_filename + ".asm");
 
-    out_file << "global _start\n";
-    out_file << "segment .text\n";
-
-    // Created using a C program to print a number
-    // with a new line
-    out_file << "dump:\n";
-    out_file << "    push    rbp\n";
-    out_file << "    mov     rbp, rsp\n";
-    out_file << "    sub     rsp, 64\n";
-    out_file << "    mov     QWORD [rbp-56], rdi\n";
-    out_file << "    mov     DWORD [rbp-4], 1\n";
-    out_file << "    mov     edx, DWORD [rbp-4]\n";
-    out_file << "    mov     eax, 32\n";
-    out_file << "    sub     rax, rdx\n";
-    out_file << "    mov     BYTE [rbp-48+rax], 10\n";
-    out_file << ".L2:\n";
-    out_file << "    mov     rcx, QWORD [rbp-56]\n";
-    out_file << "    mov     rdx, -3689348814741910323\n";
-    out_file << "    mov     rax, rcx\n";
-    out_file << "    mul     rdx\n";
-    out_file << "    shr     rdx, 3\n";
-    out_file << "    mov     rax, rdx\n";
-    out_file << "    sal     rax, 2\n";
-    out_file << "    add     rax, rdx\n";
-    out_file << "    add     rax, rax\n";
-    out_file << "    sub     rcx, rax\n";
-    out_file << "    mov     rdx, rcx\n";
-    out_file << "    mov     eax, edx\n";
-    out_file << "    lea     ecx, [rax+48]\n";
-    out_file << "    mov     edx, DWORD [rbp-4]\n";
-    out_file << "    mov     eax, 31\n";
-    out_file << "    sub     rax, rdx\n";
-    out_file << "    mov     edx, ecx\n";
-    out_file << "    mov     BYTE [rbp-48+rax], dl\n";
-    out_file << "    add     DWORD [rbp-4], 1\n";
-    out_file << "    mov     rax, QWORD [rbp-56]\n";
-    out_file << "    mov     rdx, -3689348814741910323\n";
-    out_file << "    mul     rdx\n";
-    out_file << "    mov     rax, rdx\n";
-    out_file << "    shr     rax, 3\n";
-    out_file << "    mov     QWORD [rbp-56], rax\n";
-    out_file << "    cmp     QWORD [rbp-56], 0\n";
-    out_file << "    jne     .L2\n";
-    out_file << "    mov     eax, DWORD [rbp-4]\n";
-    out_file << "    mov     edx, DWORD [rbp-4]\n";
-    out_file << "    mov     ecx, 32\n";
-    out_file << "    sub     rcx, rdx\n";
-    out_file << "    lea     rdx, [rbp-48]\n";
-    out_file << "    add     rcx, rdx\n";
-    out_file << "    mov     rdx, rax\n";
-    out_file << "    mov     rsi, rcx\n";
-    out_file << "    mov     edi, 1\n";
-    out_file << "    mov     rax, 1\n";
-    out_file << "    syscall\n";
-    out_file << "    nop\n";
-    out_file << "    leave\n";
-    out_file << "    ret\n";
-
-
-    out_file << "_start:\n";
+    add_boilerplate_asm(out_file);
 
     // Check for whether implemented every operation in Operations
     assert(8 == Operations::OP_CNT && "Implement every operation");
@@ -701,4 +643,68 @@ void print_error(const std::string& program_file_name, const int line_num,
         const int col, const std::string msg) {
     std::cerr << program_file_name << ':' << line_num << ':'
         << col << ": ERROR: " << msg << '\n';
+}
+
+
+void add_boilerplate_asm(std::ofstream& out_file) {
+    out_file << "global _start\n";
+    out_file << "segment .text\n";
+
+    // Created using a C program to print a number
+    // with a new line
+    out_file << "dump:\n";
+    out_file << "    push    rbp\n";
+    out_file << "    mov     rbp, rsp\n";
+    out_file << "    sub     rsp, 64\n";
+    out_file << "    mov     QWORD [rbp-56], rdi\n";
+    out_file << "    mov     DWORD [rbp-4], 1\n";
+    out_file << "    mov     edx, DWORD [rbp-4]\n";
+    out_file << "    mov     eax, 32\n";
+    out_file << "    sub     rax, rdx\n";
+    out_file << "    mov     BYTE [rbp-48+rax], 10\n";
+    out_file << ".L2:\n";
+    out_file << "    mov     rcx, QWORD [rbp-56]\n";
+    out_file << "    mov     rdx, -3689348814741910323\n";
+    out_file << "    mov     rax, rcx\n";
+    out_file << "    mul     rdx\n";
+    out_file << "    shr     rdx, 3\n";
+    out_file << "    mov     rax, rdx\n";
+    out_file << "    sal     rax, 2\n";
+    out_file << "    add     rax, rdx\n";
+    out_file << "    add     rax, rax\n";
+    out_file << "    sub     rcx, rax\n";
+    out_file << "    mov     rdx, rcx\n";
+    out_file << "    mov     eax, edx\n";
+    out_file << "    lea     ecx, [rax+48]\n";
+    out_file << "    mov     edx, DWORD [rbp-4]\n";
+    out_file << "    mov     eax, 31\n";
+    out_file << "    sub     rax, rdx\n";
+    out_file << "    mov     edx, ecx\n";
+    out_file << "    mov     BYTE [rbp-48+rax], dl\n";
+    out_file << "    add     DWORD [rbp-4], 1\n";
+    out_file << "    mov     rax, QWORD [rbp-56]\n";
+    out_file << "    mov     rdx, -3689348814741910323\n";
+    out_file << "    mul     rdx\n";
+    out_file << "    mov     rax, rdx\n";
+    out_file << "    shr     rax, 3\n";
+    out_file << "    mov     QWORD [rbp-56], rax\n";
+    out_file << "    cmp     QWORD [rbp-56], 0\n";
+    out_file << "    jne     .L2\n";
+    out_file << "    mov     eax, DWORD [rbp-4]\n";
+    out_file << "    mov     edx, DWORD [rbp-4]\n";
+    out_file << "    mov     ecx, 32\n";
+    out_file << "    sub     rcx, rdx\n";
+    out_file << "    lea     rdx, [rbp-48]\n";
+    out_file << "    add     rcx, rdx\n";
+    out_file << "    mov     rdx, rax\n";
+    out_file << "    mov     rsi, rcx\n";
+    out_file << "    mov     edi, 1\n";
+    out_file << "    mov     rax, 1\n";
+    out_file << "    syscall\n";
+    out_file << "    nop\n";
+    out_file << "    leave\n";
+    out_file << "    ret\n";
+
+
+    out_file << "_start:\n";
 }
