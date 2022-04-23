@@ -207,7 +207,7 @@ int main(int argc, char **argv) {
         if (isdigit(line.at(i))) {
             int col_start = i + 1;
             int num_idx = 0;
-            for (; isdigit(line.at(i)) && i < line.size(); ++i) {
+            for (; i < line.size() && isdigit(line.at(i)); ++i) {
                 number_str[num_idx] = line.at(i);
                 ++num_idx;
             }
@@ -216,6 +216,7 @@ int main(int argc, char **argv) {
             op.op_type(Operations::OP_PUSH);
             op.col(col_start);
             line_ops.push_back(op);
+            continue;
         }
 
         if (isspace(line.at(i))) {
