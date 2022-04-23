@@ -14,6 +14,7 @@
 #define MAX_STACK_SIZE 1024
 
 #define STR_KEYWORD_END "end"
+#define STR_KEYWORD_WHILE "while"
 #define STR_KEYWORD_ELSE "else"
 
 enum Operations {
@@ -25,8 +26,10 @@ enum Operations {
     OP_IF,
     OP_ELSE,
     OP_END,
+    OP_WHILE,
     OP_CNT, // This value is treated as UNKNOWN OPERATION
 };
+
 
 #define OPS_IMPLEMENTED 4
 
@@ -96,6 +99,8 @@ int generate_asm_for_if_else(std::ofstream& out_file,
 void print_error(const std::string& program_file_name, const int line_num,
         const int col, const std::string msg);
 void add_boilerplate_asm(std::ofstream& out_file);
+uint64_t while_loop_span(std::list<Operation>::iterator begin,
+        std::list<Operation>::iterator end);
 
 
 int main(int argc, char **argv) {
@@ -224,7 +229,7 @@ int main(int argc, char **argv) {
         }
 
         // Check for whether implemented every operation in Operations
-        assert(8 == Operations::OP_CNT && "Implement every operation");
+        assert(9 == Operations::OP_CNT && "Implement every operation" "parse_op_from_line");
         int col_start = i + 1;
         switch (line.at(i)) {
             case '+':
@@ -258,6 +263,17 @@ int main(int argc, char **argv) {
                             STR_KEYWORD_ELSE) == 0) {
                     op.op_type(Operations::OP_ELSE);
                     i += strlen(STR_KEYWORD_ELSE);
+                }
+                else {
+                    op.op_type(Operations::OP_CNT);
+                }
+                break;
+
+            case 'w':
+                if (line.compare(i, strlen(STR_KEYWORD_WHILE),
+                            STR_KEYWORD_WHILE) == 0) {
+                    op.op_type(Operations::OP_WHILE);
+                    i += strlen(STR_KEYWORD_WHILE);
                 }
                 else {
                     op.op_type(Operations::OP_CNT);
@@ -302,6 +318,9 @@ void simulate_program(std::string program_file_name,
     std::cout << "Simulating\n";
     std::stack<uint64_t> program_stack;
 
+    bool IN_WHILE_LOOP = false;
+    uint64_t LOOP_BODY_SIZE = 0;
+
     bool SKIP_IF_BODY = false;
     bool SKIP_ELSE_BODY = false;
     int if_stmt_line_no = 0;
@@ -309,7 +328,8 @@ void simulate_program(std::string program_file_name,
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
     {
         // Check for whether implemented every operation in Operations
-        assert(8 == Operations::OP_CNT && "Implement every operation");
+        assert(9 == Operations::OP_CNT && "Implement every operation"
+                && "simulate_program()");
 
         if (it->op_type() == OP_END) {
             SKIP_IF_BODY = false;
@@ -331,7 +351,7 @@ void simulate_program(std::string program_file_name,
             case Operations::OP_PUSH:
                 if (program_stack.size() >= MAX_STACK_SIZE) {
                     print_error(program_file_name, it->line(), it->col(),
-                    "Stack size exceeded limit");
+                            "Stack size exceeded limit");
                     exit(EXIT_FAILURE);
                 }
                 program_stack.push(it->operand());
@@ -347,7 +367,7 @@ void simulate_program(std::string program_file_name,
                 }
                 else {
                     print_error(program_file_name, it->line(), it->col(),
-                    "ERROR: Not enough elements in stack for OP_PLUS(+) operation");
+                            "ERROR: Not enough elements in stack for OP_PLUS(+) operation");
                     exit(EXIT_FAILURE);
                 }
                 break;
@@ -362,7 +382,7 @@ void simulate_program(std::string program_file_name,
                 }
                 else {
                     print_error(program_file_name, it->line(), it->col(),
-                    "Not enough elements in stack for OP_MINUS(-) operation");
+                            "Not enough elements in stack for OP_MINUS(-) operation");
                     exit(EXIT_FAILURE);
                 }
                 break;
@@ -370,7 +390,7 @@ void simulate_program(std::string program_file_name,
             case Operations::OP_DUMP:
                 if (program_stack.size() < 1) {
                     print_error(program_file_name, it->line(), it->col(),
-                    "Not enough elements in stack for OP_DUMP operation");
+                            "Not enough elements in stack for OP_DUMP operation");
                     exit(EXIT_FAILURE);
                 }
                 else {
@@ -382,7 +402,7 @@ void simulate_program(std::string program_file_name,
             case Operations::OP_EQUAL:
                 if (program_stack.size() < 2) {
                     print_error(program_file_name, it->line(), it->col(),
-                    "Not enough elements in stack for OP_EQUAL operation");
+                            "Not enough elements in stack for OP_EQUAL operation");
                     exit(EXIT_FAILURE);
                 }
                 else {
@@ -390,15 +410,17 @@ void simulate_program(std::string program_file_name,
                     program_stack.pop();
                     uint64_t b = program_stack.top();
                     program_stack.pop();
-
-                    program_stack.push(a == b);
+                    bool res = (a == b);
+                    program_stack.push(b);
+                    program_stack.push(a);
+                    program_stack.push(res);
                 }
                 break;
 
             case Operations::OP_IF:
                 if (program_stack.size() < 1) {
                     print_error(program_file_name, it->line(), it->col(),
-                    "Not enough elements in stack for OP_IF operation");
+                            "Not enough elements in stack for OP_IF operation");
                     exit(EXIT_FAILURE);
                 }
                 else {
@@ -417,11 +439,42 @@ void simulate_program(std::string program_file_name,
 
             case Operations::OP_END:
                 // This Operation is handled outside the switch case.
+                if (IN_WHILE_LOOP) {
+                    for (uint64_t k = 0; k < LOOP_BODY_SIZE; ++k) {
+                        --it;
+                    }
+                    --it;
+                }
                 break;
 
             case Operations::OP_ELSE:
                 if (!SKIP_IF_BODY) {
                     SKIP_ELSE_BODY = true;
+                }
+                break;
+
+            case Operations::OP_WHILE:
+                if (program_stack.size() < 1) {
+                    print_error(program_file_name, it->line(), it->col(),
+                            "Not enough elements in stack for OP_WHILE operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    uint64_t bool_result = program_stack.top();
+                    LOOP_BODY_SIZE = while_loop_span(it, operations_list.end());
+                    if (bool_result == 0) {
+                        if (IN_WHILE_LOOP) {
+                            IN_WHILE_LOOP = false;
+                        }
+                        else {
+                        }
+                        for (uint64_t k = 0; k < LOOP_BODY_SIZE - 1; ++k)
+                            ++it;
+                        break;
+                    }
+                    else {
+                        IN_WHILE_LOOP = true;
+                    }
                 }
                 break;
 
@@ -433,7 +486,7 @@ void simulate_program(std::string program_file_name,
     }
     if ( SKIP_IF_BODY || SKIP_ELSE_BODY) {
         print_error(program_file_name, if_stmt_line_no, if_stmt_col_no,
-                    "Unclosed if statement");
+                "Unclosed if statement");
         exit(EXIT_FAILURE);
     }
 }
@@ -465,7 +518,8 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     add_boilerplate_asm(out_file);
 
     // Check for whether implemented every operation in Operations
-    assert(8 == Operations::OP_CNT && "Implement every operation");
+    assert(8 == Operations::OP_CNT && "Implement every operation"
+            "compile_program");
     uint64_t branch_counter = 0;
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
@@ -572,6 +626,10 @@ void compile_program(std::string output_filename, std::list<Operation> operation
             case Operations::OP_ELSE:
                 out_file << "    jmp branch" << branch_counter << "\n";
                 out_file << "branch" << branch_counter << "else:\n";
+                break;
+
+            case Operations::OP_WHILE:
+                assert(false && "Not implemented OP_WHILE for compilation mode");
                 break;
 
             default:
@@ -720,4 +778,42 @@ void add_boilerplate_asm(std::ofstream& out_file) {
 
 
     out_file << "_start:\n";
+}
+
+
+uint64_t while_loop_span(std::list<Operation>::iterator begin,
+        std::list<Operation>::iterator end) {
+    assert(begin->op_type() == Operations::OP_WHILE);
+    ++begin;
+    uint64_t ip_count = 1;
+
+    int if_conditions_count = 0;
+    /* int conditional_end_count = 0; */
+    for (; begin != end; ++begin) {
+        if (begin->op_type() == Operations::OP_IF) {
+            ++if_conditions_count;
+        }
+        else if (begin->op_type() == Operations::OP_END) {
+            if (if_conditions_count == 0) {
+                break;
+            }
+            else {
+                --if_conditions_count;
+            }
+        }
+        else {
+            // pass
+        }
+        ++ip_count;
+    }
+    if (begin == end) {
+        std::cerr << "ERRRROR: Unclosed end block in while\n";
+        exit(EXIT_FAILURE);
+    }
+    if (if_conditions_count != 0) {
+        std::cerr << "ERRRROR: Unclosed end block in while\n";
+        exit(EXIT_FAILURE);
+    }
+
+    return ip_count + 1;
 }
