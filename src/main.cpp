@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
         }
 
         // Check for whether implemented every operation in Operations
-        assert(10 == Operations::OP_CNT && "Implement every operation" "parse_op_from_line");
+        assert(11 == Operations::OP_CNT && "Implement every operation" "parse_op_from_line");
         int col_start = i + 1;
         switch (line.at(i)) {
             case '+':
@@ -152,6 +152,9 @@ int main(int argc, char **argv) {
                 break;
             case '=':
                 op.op_type(Operations::OP_EQUALS);
+                break;
+            case '<':
+                op.op_type(Operations::OP_LESS_THAN);
                 break;
             case 'i':
                 if (line.at(i + 1) == 'f') {
@@ -242,7 +245,7 @@ void simulate_program(std::string program_file_name,
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
     {
-        assert(10 == Operations::OP_CNT && "Implement every operation"
+        assert(11 == Operations::OP_CNT && "Implement every operation"
                 && "simulate_program()");
 
         switch (it->op_type()) {
@@ -309,6 +312,21 @@ void simulate_program(std::string program_file_name,
                     uint64_t b = program_stack.top();
                     program_stack.pop();
                     program_stack.push(a == b);
+                }
+                break;
+
+            case Operations::OP_LESS_THAN:
+                if (program_stack.size() < 2) {
+                    print_error(program_file_name, it->line(), it->col(),
+                            "Not enough elements in stack for OP_LESS_THAN operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    uint64_t a = program_stack.top();
+                    program_stack.pop();
+                    uint64_t b = program_stack.top();
+                    program_stack.pop();
+                    program_stack.push(b < a);
                 }
                 break;
 
@@ -403,7 +421,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     std::stack<uint64_t> conditional_stack;
 
     // Check for whether implemented every operation in Operations
-    assert(10 == Operations::OP_CNT && "Implement every operation"
+    assert(11 == Operations::OP_CNT && "Implement every operation"
             "compile_program");
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
@@ -494,6 +512,26 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                     out_file << "    mov rdx, 1\n";
                     out_file << "    cmp rax, rbx\n";
                     out_file << "    cmove rcx, rdx\n";
+                    out_file << "    push rcx\n";
+                    --mock_stack_size;
+                }
+                break;
+
+            case Operations::OP_LESS_THAN:
+                if (mock_stack_size < 2) {
+                    print_error(output_filename, it->line(), it->col(),
+                            "Not enough elements in stack for OP_EQUALS(=) operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    out_file << "    ;; OP_EQUALS\n";
+                    out_file << "    pop rax\n";
+                    out_file << "    pop rbx\n";
+
+                    out_file << "    mov rcx, 0\n";
+                    out_file << "    mov rdx, 1\n";
+                    out_file << "    cmp rbx, rax\n";
+                    out_file << "    cmovl rcx, rdx\n";
                     out_file << "    push rcx\n";
                     --mock_stack_size;
                 }
@@ -732,11 +770,12 @@ uint64_t while_loop_span(std::list<Operation>::iterator begin,
 }
 
 
+// Adds where a conditional statement ends
 void crossreference_conditional(std::list<Operation>::iterator begin,
         std::list<Operation>::iterator end) {
     std::stack<Operation *> conditional_op;
     // Check for whether implemented conditional operation in Operations
-    assert(10 == Operations::OP_CNT && "Implement conditional operations" "crossreference_conditional");
+    assert(11 == Operations::OP_CNT && "Implement conditional operations" "crossreference_conditional");
     uint64_t ip = 0;
     for (auto it = begin; it != end; ++it, ++ip) {
         if (it->op_type() == Operations::OP_IF) {
