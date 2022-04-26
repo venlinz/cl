@@ -9,98 +9,7 @@
 #include <cstdlib>
 #include <cstring>
 
-#define MAX_KEYWORD_LEN 32
-#define TEST_PROGRAM "./examples/test.cl"
-#define MAX_STACK_SIZE 1024
-
-#define STR_KEYWORD_END "end"
-#define STR_KEYWORD_WHILE "while"
-#define STR_KEYWORD_ELSE "else"
-
-enum Operations {
-    OP_PUSH,
-    OP_PLUS,
-    OP_MINUS,
-    OP_DUMP,
-    OP_EQUAL,
-    OP_IF,
-    OP_ELSE,
-    OP_END,
-    OP_WHILE,
-    OP_CNT, // This value is treated as UNKNOWN OPERATION
-};
-
-
-#define OPS_IMPLEMENTED 4
-
-
-class Operation {
-    private:
-        Operations m_op;
-        uint64_t m_opr;
-        int m_line;
-        int m_col;
-
-    public:
-        Operation() {};
-        Operation(Operations op_type, int line_no, int col_no)
-            : m_op(op_type), m_line(line_no), m_col(col_no)
-        { }
-        int line() const {
-            return m_line;
-        }
-        void line(int line) {
-            m_line = line;
-        }
-
-        Operations op_type() const {
-            return m_op;
-        }
-        void op_type(Operations op_type) {
-            m_op = op_type;
-        }
-
-        int col() const {
-            return m_col;
-        }
-        void col(int col) {
-            m_col = col;
-        }
-
-        uint64_t operand() const {
-            return m_opr;
-        }
-        void operand(uint64_t operand) {
-            m_opr = operand;
-        }
-};
-
-
-#define STR_OPT_COMPILE "c"
-#define STR_OPT_SIMULATE "s"
-#define STR_OPT_HELP "help"
-
-#define OUTPUT_FILENAME "output"
-
-[[nodiscard]] std::list<Operation> parse_program(std::string program_file_name);
-[[nodiscard]] std::list<Operation> parse_op_from_line(std::string line);
-[[maybe_unused]] size_t lstrip(std::string &str);
-void simulate_program(std::string program_file_name,
-        std::list<Operation> operations_list);
-void print_usage(std::string program);
-void print_help();
-void compile_program(std::string output_filename,
-        std::list<Operation> operations_list);
-void exec(const std::string cmd);
-int generate_asm_for_if_else(std::ofstream& out_file,
-        std::list<Operation>::iterator begin,
-        std::list<Operation>::iterator end,
-        uint64_t ip);
-void print_error(const std::string& program_file_name, const int line_num,
-        const int col, const std::string msg);
-void add_boilerplate_asm(std::ofstream& out_file);
-uint64_t while_loop_span(std::list<Operation>::iterator begin,
-        std::list<Operation>::iterator end);
+#include "main.h"
 
 
 int main(int argc, char **argv) {
@@ -318,34 +227,11 @@ void simulate_program(std::string program_file_name,
     std::cout << "Simulating\n";
     std::stack<uint64_t> program_stack;
 
-    bool IN_WHILE_LOOP = false;
-    uint64_t LOOP_BODY_SIZE = 0;
-
-    bool SKIP_IF_BODY = false;
-    bool SKIP_ELSE_BODY = false;
-    int if_stmt_line_no = 0;
-    int if_stmt_col_no = 0;
-    for (auto it = operations_list.begin(); it != operations_list.end(); ++it)
+    uint64_t ip = 0;
+    for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
     {
-        // Check for whether implemented every operation in Operations
         assert(9 == Operations::OP_CNT && "Implement every operation"
                 && "simulate_program()");
-
-        if (it->op_type() == OP_END) {
-            SKIP_IF_BODY = false;
-            SKIP_ELSE_BODY = false;
-        }
-
-        if (SKIP_ELSE_BODY) {
-            continue;
-        }
-
-        if (SKIP_IF_BODY) {
-            if (it->op_type() == OP_ELSE) {
-                SKIP_IF_BODY = false;
-            }
-            continue;
-        }
 
         switch (it->op_type()) {
             case Operations::OP_PUSH:
@@ -367,7 +253,7 @@ void simulate_program(std::string program_file_name,
                 }
                 else {
                     print_error(program_file_name, it->line(), it->col(),
-                            "ERROR: Not enough elements in stack for OP_PLUS(+) operation");
+                            "Not enough elements in stack for OP_PLUS(+) operation");
                     exit(EXIT_FAILURE);
                 }
                 break;
@@ -410,10 +296,7 @@ void simulate_program(std::string program_file_name,
                     program_stack.pop();
                     uint64_t b = program_stack.top();
                     program_stack.pop();
-                    bool res = (a == b);
-                    program_stack.push(b);
-                    program_stack.push(a);
-                    program_stack.push(res);
+                    program_stack.push(a == b);
                 }
                 break;
 
@@ -426,31 +309,22 @@ void simulate_program(std::string program_file_name,
                 else {
                     // if statement will not consume the bool_result
                     uint64_t bool_result = program_stack.top();
+                    crossreference_conditional(it, operations_list.end(), ip);
                     if (bool_result == 0) {
-                        SKIP_IF_BODY = true;
+                        auto ifp = it;
+                        while (ip != ifp->jump_loc()) {
+                            ++ip;
+                            ++it;
+                        }
                     }
-                    else {
-                        SKIP_IF_BODY = false;
-                    }
-                    if_stmt_line_no = it->line();
-                    if_stmt_col_no = it->col();
                 }
                 break;
 
             case Operations::OP_END:
                 // This Operation is handled outside the switch case.
-                if (IN_WHILE_LOOP) {
-                    for (uint64_t k = 0; k < LOOP_BODY_SIZE; ++k) {
-                        --it;
-                    }
-                    --it;
-                }
                 break;
 
             case Operations::OP_ELSE:
-                if (!SKIP_IF_BODY) {
-                    SKIP_ELSE_BODY = true;
-                }
                 break;
 
             case Operations::OP_WHILE:
@@ -460,21 +334,6 @@ void simulate_program(std::string program_file_name,
                     exit(EXIT_FAILURE);
                 }
                 else {
-                    uint64_t bool_result = program_stack.top();
-                    LOOP_BODY_SIZE = while_loop_span(it, operations_list.end());
-                    if (bool_result == 0) {
-                        if (IN_WHILE_LOOP) {
-                            IN_WHILE_LOOP = false;
-                        }
-                        else {
-                        }
-                        for (uint64_t k = 0; k < LOOP_BODY_SIZE - 1; ++k)
-                            ++it;
-                        break;
-                    }
-                    else {
-                        IN_WHILE_LOOP = true;
-                    }
                 }
                 break;
 
@@ -483,11 +342,6 @@ void simulate_program(std::string program_file_name,
                         "Operation unknown");
                 exit(EXIT_FAILURE);
         }
-    }
-    if ( SKIP_IF_BODY || SKIP_ELSE_BODY) {
-        print_error(program_file_name, if_stmt_line_no, if_stmt_col_no,
-                "Unclosed if statement");
-        exit(EXIT_FAILURE);
     }
 }
 
@@ -816,4 +670,22 @@ uint64_t while_loop_span(std::list<Operation>::iterator begin,
     }
 
     return ip_count + 1;
+}
+
+
+void crossreference_conditional(std::list<Operation>::iterator begin,
+        std::list<Operation>::iterator end, uint64_t ip) {
+    std::stack<Operation *> conditional_op;
+    // Check for whether implemented conditional operation in Operations
+    assert(9 == Operations::OP_CNT && "Implement conditional operations" "crossreference_conditional");
+    for (auto it = begin; it != end; ++it, ++ip) {
+        if (it->op_type() == Operations::OP_IF) {
+            conditional_op.push(&(*it));
+        }
+        else if (it->op_type() == Operations::OP_END) {
+            auto c_op = conditional_op.top();
+            conditional_op.pop();
+            c_op->jump_loc(ip);
+        }
+    }
 }

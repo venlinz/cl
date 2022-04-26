@@ -5,4 +5,4 @@ project(cl VERSION 0.1
 
 add_compile_options(-Wall -Wextra -pedantic -Werror
     -pedantic-errors -Wconversion -Wshadow -ggdb3)
-add_executable(cl main.cpp)
+add_executable(cl main.cpp main.h)
