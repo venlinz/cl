@@ -671,15 +671,6 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                     // Hack to make else-less if statement work
                     conditional_stack.push(0);
                     out_file << "    jz br" << it->jump_loc() << "else\n";
-                    // if statement should not consume the bool_result
-                    /* branch_counter = ip; */
-                    /* int err_num = generate_asm_for_if_else(out_file, it, */
-                    /*         operations_list.end(), ip); */
-                    /* if (err_num) { */
-                    /*     print_error(output_filename, it->line(), it->col(), */
-                    /*             "Non closed if statement"); */
-                    /*     exit(EXIT_FAILURE); */
-                    /* } */
                 }
                 break;
             case Operations::OP_END:
