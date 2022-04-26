@@ -15,6 +15,7 @@ enum Operations {
     OP_MINUS,
     OP_DUMP,
     OP_EQUALS,
+    OP_LESS_THAN_EQ,
     OP_LESS_THAN,
     OP_IF,
     OP_ELSE,
