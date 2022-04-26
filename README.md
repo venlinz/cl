@@ -51,7 +51,7 @@ Note: does not support negative numbers.
 
 ### Branching
 ```code
-10 2 + = 12 if
+10 2 + 12 = 12 if
   1 .
   5 2 + 7 = if
     1 .
