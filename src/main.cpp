@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
         }
 
         // Check for whether implemented every operation in Operations
-        assert(9 == Operations::OP_CNT && "Implement every operation" "parse_op_from_line");
+        assert(10 == Operations::OP_CNT && "Implement every operation" "parse_op_from_line");
         int col_start = i + 1;
         switch (line.at(i)) {
             case '+':
@@ -189,6 +189,17 @@ int main(int argc, char **argv) {
                 }
                 break;
 
+            case 'd':
+                if (line.compare(i, strlen(STR_KEYWORD_DUP),
+                            STR_KEYWORD_DUP) == 0) {
+                    op.op_type(Operations::OP_DUP);
+                    i += strlen(STR_KEYWORD_DUP);
+                }
+                else {
+                    op.op_type(Operations::OP_CNT);
+                }
+                break;
+
             default:
                 std::cerr << line.at(i) << '\n';
                 op.op_type(Operations::OP_CNT);
@@ -231,7 +242,7 @@ void simulate_program(std::string program_file_name,
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
     {
-        assert(9 == Operations::OP_CNT && "Implement every operation"
+        assert(10 == Operations::OP_CNT && "Implement every operation"
                 && "simulate_program()");
 
         switch (it->op_type()) {
@@ -301,6 +312,17 @@ void simulate_program(std::string program_file_name,
                 }
                 break;
 
+            case Operations::OP_DUP:
+                if (program_stack.size() < 1) {
+                    print_error(program_file_name, it->line(), it->col(),
+                            "Not enough elements in stack for OP_EQUAL operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    program_stack.push(program_stack.top());
+                }
+                break;
+
             case Operations::OP_IF:
                 if (program_stack.size() < 1) {
                     print_error(program_file_name, it->line(), it->col(),
@@ -333,13 +355,14 @@ void simulate_program(std::string program_file_name,
                 break;
 
             case Operations::OP_WHILE:
-                if (program_stack.size() < 1) {
-                    print_error(program_file_name, it->line(), it->col(),
-                            "Not enough elements in stack for OP_WHILE operation");
-                    exit(EXIT_FAILURE);
-                }
-                else {
-                }
+                assert(false && "Not implemented  while loop");
+                /* if (program_stack.size() < 1) { */
+                /*     print_error(program_file_name, it->line(), it->col(), */
+                /*             "Not enough elements in stack for OP_WHILE operation"); */
+                /*     exit(EXIT_FAILURE); */
+                /* } */
+                /* else { */
+                /* } */
                 break;
 
             default:
@@ -682,7 +705,7 @@ void crossreference_conditional(std::list<Operation>::iterator begin,
         std::list<Operation>::iterator end) {
     std::stack<Operation *> conditional_op;
     // Check for whether implemented conditional operation in Operations
-    assert(9 == Operations::OP_CNT && "Implement conditional operations" "crossreference_conditional");
+    assert(10 == Operations::OP_CNT && "Implement conditional operations" "crossreference_conditional");
     uint64_t ip = 0;
     for (auto it = begin; it != end; ++it, ++ip) {
         if (it->op_type() == Operations::OP_IF) {

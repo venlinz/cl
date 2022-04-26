@@ -7,6 +7,7 @@
 #define STR_KEYWORD_END "end"
 #define STR_KEYWORD_WHILE "while"
 #define STR_KEYWORD_ELSE "else"
+#define STR_KEYWORD_DUP "dup"
 
 enum Operations {
     OP_PUSH,
@@ -17,6 +18,7 @@ enum Operations {
     OP_IF,
     OP_ELSE,
     OP_END,
+    OP_DUP,
     OP_WHILE,
     OP_CNT, // This value is treated as UNKNOWN OPERATION
 };
