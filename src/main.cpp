@@ -333,8 +333,8 @@ void simulate_program(std::string program_file_name,
                     // if statement will not consume the bool_result
                     uint64_t bool_result = program_stack.top();
                     if (bool_result == 0) {
-                        auto ifp = it;
-                        while (ip != ifp->jump_loc()) {
+                        auto ifp = it->jump_loc();
+                        while (ip != ifp) {
                             ++ip;
                             ++it;
                         }
@@ -399,26 +399,33 @@ void compile_program(std::string output_filename, std::list<Operation> operation
 
     add_boilerplate_asm(out_file);
 
+    crossreference_conditional(operations_list.begin(), operations_list.end());
+    std::stack<uint64_t> conditional_stack;
+
     // Check for whether implemented every operation in Operations
-    assert(8 == Operations::OP_CNT && "Implement every operation"
+    assert(10 == Operations::OP_CNT && "Implement every operation"
             "compile_program");
-    uint64_t branch_counter = 0;
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
     {
+        if (mock_stack_size >= MAX_STACK_SIZE) {
+            std::cerr << "Stack size exceeded limit\n";
+            exit(EXIT_FAILURE);
+        }
         switch (it->op_type()) {
             case Operations::OP_PUSH:
-                if (mock_stack_size >= MAX_STACK_SIZE) {
-                    std::cerr << "Stack size exceeded limit\n";
-                    exit(EXIT_FAILURE);
-                }
                 out_file << "    ;; OP_PUSH\n";
                 out_file << "    push " << it->operand() << '\n';
                 ++mock_stack_size;
                 break;
 
             case Operations::OP_PLUS:
-                if (mock_stack_size >= 2) {
+                if (mock_stack_size < 2) {
+                    print_error(output_filename, it->line(), it->col(),
+                            "Not enough elements in stack for OP_PLUS(+) operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
                     out_file << "    ;; ADD\n";
                     out_file << "    pop rdx\n";
                     out_file << "    pop rsi\n";
@@ -426,15 +433,15 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                     out_file << "    push rdx\n";
                     --mock_stack_size;
                 }
-                else {
-                    std::cerr << "ERROR: Not enough elements in stack for "
-                        << "OP_PLUS(+) operation\n";
-                    exit(EXIT_FAILURE);
-                }
                 break;
 
             case Operations::OP_MINUS:
-                if (mock_stack_size >= 2) {
+                if (mock_stack_size < 2) {
+                    print_error(output_filename, it->line(), it->col(),
+                            "Not enough elements in stack for OP_MINUS(-) operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
                     out_file << "    ;; OP_MINUS\n";
                     out_file << "    pop rdx\n";
                     out_file << "    pop rsi\n";
@@ -442,29 +449,43 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                     out_file << "    push rsi\n";
                     --mock_stack_size;
                 }
-                else {
-                    std::cerr << "ERROR: Not enough elements in stack for "
-                        << "OP_MINUS(-) operation\n";
-                    exit(EXIT_FAILURE);
-                }
                 break;
 
             case Operations::OP_DUMP:
-                if (mock_stack_size >= 1) {
+                if (mock_stack_size < 1) {
+                    print_error(output_filename, it->line(), it->col(),
+                            "Not enough elements in stack for OP_DUMP operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
                     out_file << "    ;; OP_DUMP\n";
                     out_file << "    pop rdi\n";
                     out_file << "    call dump\n";
                     --mock_stack_size;
                 }
-                else {
-                    std::cerr << "ERROR: Not enough elements in stack for "
-                        << "OP_DUMP operation\n";
+                break;
+
+            case Operations::OP_DUP:
+                if (mock_stack_size < 1) {
+                    print_error(output_filename, it->line(), it->col(),
+                            "Not enough elements in stack for OP_DUP operation");
                     exit(EXIT_FAILURE);
+                }
+                else {
+                    out_file << "    pop rax\n";
+                    out_file << "    push rax\n";
+                    out_file << "    push rax\n";
+                    ++mock_stack_size;
                 }
                 break;
 
             case Operations::OP_EQUAL:
-                if (mock_stack_size >= 2) {
+                if (mock_stack_size < 2) {
+                    print_error(output_filename, it->line(), it->col(),
+                            "Not enough elements in stack for OP_EQUAL(=) operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
                     out_file << "    ;; OP_EQUAL\n";
                     out_file << "    pop rax\n";
                     out_file << "    pop rbx\n";
@@ -476,38 +497,48 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                     out_file << "    push rcx\n";
                     --mock_stack_size;
                 }
-                else {
-                    std::cerr << "ERROR: Not enough elements in stack for "
-                        << "OP_EQUAL(-) operation\n";
-                    exit(EXIT_FAILURE);
-                }
                 break;
 
             case Operations::OP_IF:
                 if (mock_stack_size < 1) {
-                    std::cout << "ERROR: Not enough elements in stack for "
-                        << "OP_IF operation\n";
+                    print_error(output_filename, it->line(), it->col(),
+                            "Not enough elements in stack for OP_IF operation");
                     exit(EXIT_FAILURE);
                 }
                 else {
+                    out_file << "    ;; OP_IF\n";
+                    out_file << "    pop rax\n";
+                    out_file << "    test rax, rax\n";
+                    conditional_stack.push(it->jump_loc());
+                    // Hack to make else-less if statement work
+                    conditional_stack.push(0);
+                    out_file << "    jz br" << it->jump_loc() << "else\n";
                     // if statement should not consume the bool_result
-                    branch_counter = ip;
-                    int err_num = generate_asm_for_if_else(out_file, it,
-                            operations_list.end(), ip);
-                    if (err_num) {
-                        print_error(output_filename, it->line(), it->col(),
-                                "Non closed if statement");
-                        exit(EXIT_FAILURE);
-                    }
+                    /* branch_counter = ip; */
+                    /* int err_num = generate_asm_for_if_else(out_file, it, */
+                    /*         operations_list.end(), ip); */
+                    /* if (err_num) { */
+                    /*     print_error(output_filename, it->line(), it->col(), */
+                    /*             "Non closed if statement"); */
+                    /*     exit(EXIT_FAILURE); */
+                    /* } */
                 }
                 break;
             case Operations::OP_END:
-                out_file << "branch" << branch_counter << ":\n";
+                // Hack to make else-less if statement work
+                if (conditional_stack.top() == 0) {
+                    conditional_stack.pop();
+                    out_file << "br" << conditional_stack.top() << "else:\n";
+                }
+                out_file << "br" << conditional_stack.top() << ":\n";
+                conditional_stack.pop();
                 break;
 
             case Operations::OP_ELSE:
-                out_file << "    jmp branch" << branch_counter << "\n";
-                out_file << "branch" << branch_counter << "else:\n";
+                // Hack to make else-less if statement work
+                conditional_stack.pop();
+                out_file << "    jmp br" << conditional_stack.top() << "\n";
+                out_file << "br" << conditional_stack.top() << "else:\n";
                 break;
 
             case Operations::OP_WHILE:
