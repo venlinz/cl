@@ -151,7 +151,7 @@ int main(int argc, char **argv) {
                 op.op_type(Operations::OP_DUMP);
                 break;
             case '=':
-                op.op_type(Operations::OP_EQUAL);
+                op.op_type(Operations::OP_EQUALS);
                 break;
             case 'i':
                 if (line.at(i + 1) == 'f') {
@@ -297,10 +297,10 @@ void simulate_program(std::string program_file_name,
                 }
                 break;
 
-            case Operations::OP_EQUAL:
+            case Operations::OP_EQUALS:
                 if (program_stack.size() < 2) {
                     print_error(program_file_name, it->line(), it->col(),
-                            "Not enough elements in stack for OP_EQUAL operation");
+                            "Not enough elements in stack for OP_EQUALS operation");
                     exit(EXIT_FAILURE);
                 }
                 else {
@@ -315,7 +315,7 @@ void simulate_program(std::string program_file_name,
             case Operations::OP_DUP:
                 if (program_stack.size() < 1) {
                     print_error(program_file_name, it->line(), it->col(),
-                            "Not enough elements in stack for OP_EQUAL operation");
+                            "Not enough elements in stack for OP_EQUALS operation");
                     exit(EXIT_FAILURE);
                 }
                 else {
@@ -479,14 +479,14 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                 }
                 break;
 
-            case Operations::OP_EQUAL:
+            case Operations::OP_EQUALS:
                 if (mock_stack_size < 2) {
                     print_error(output_filename, it->line(), it->col(),
-                            "Not enough elements in stack for OP_EQUAL(=) operation");
+                            "Not enough elements in stack for OP_EQUALS(=) operation");
                     exit(EXIT_FAILURE);
                 }
                 else {
-                    out_file << "    ;; OP_EQUAL\n";
+                    out_file << "    ;; OP_EQUALS\n";
                     out_file << "    pop rax\n";
                     out_file << "    pop rbx\n";
 
