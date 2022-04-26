@@ -227,6 +227,7 @@ void simulate_program(std::string program_file_name,
     std::cout << "Simulating\n";
     std::stack<uint64_t> program_stack;
 
+    crossreference_conditional(operations_list.begin(), operations_list.end());
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
     {
@@ -309,7 +310,6 @@ void simulate_program(std::string program_file_name,
                 else {
                     // if statement will not consume the bool_result
                     uint64_t bool_result = program_stack.top();
-                    crossreference_conditional(it, operations_list.end(), ip);
                     if (bool_result == 0) {
                         auto ifp = it;
                         while (ip != ifp->jump_loc()) {
@@ -325,6 +325,11 @@ void simulate_program(std::string program_file_name,
                 break;
 
             case Operations::OP_ELSE:
+                while (it != operations_list.end() &&
+                        it->op_type() != Operations::OP_END) {
+                    ++it;
+                    ++ip;
+                }
                 break;
 
             case Operations::OP_WHILE:
@@ -674,18 +679,35 @@ uint64_t while_loop_span(std::list<Operation>::iterator begin,
 
 
 void crossreference_conditional(std::list<Operation>::iterator begin,
-        std::list<Operation>::iterator end, uint64_t ip) {
+        std::list<Operation>::iterator end) {
     std::stack<Operation *> conditional_op;
     // Check for whether implemented conditional operation in Operations
     assert(9 == Operations::OP_CNT && "Implement conditional operations" "crossreference_conditional");
+    uint64_t ip = 0;
     for (auto it = begin; it != end; ++it, ++ip) {
         if (it->op_type() == Operations::OP_IF) {
             conditional_op.push(&(*it));
         }
         else if (it->op_type() == Operations::OP_END) {
-            auto c_op = conditional_op.top();
-            conditional_op.pop();
-            c_op->jump_loc(ip);
+            if (!conditional_op.empty()) {
+                auto c_op = conditional_op.top();
+                if (c_op->jump_loc() == 0) {
+                    c_op->jump_loc(ip);
+                }
+                conditional_op.pop();
+            }
+            else {
+                std::cerr << "Operations on empty stack\n";
+            }
+        }
+        else if (it->op_type() == Operations::OP_ELSE) {
+            if (!conditional_op.empty()) {
+                auto c_op = conditional_op.top();
+                c_op->jump_loc(ip);
+            }
+            else {
+                std::cerr << "Operations on empty stack\n";
+            }
         }
     }
 }

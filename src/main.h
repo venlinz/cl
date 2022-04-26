@@ -101,4 +101,4 @@ void add_boilerplate_asm(std::ofstream& out_file);
 uint64_t while_loop_span(std::list<Operation>::iterator begin,
         std::list<Operation>::iterator end);
 void crossreference_conditional(std::list<Operation>::iterator begin,
-        std::list<Operation>::iterator end, uint64_t ip);
+        std::list<Operation>::iterator end);
