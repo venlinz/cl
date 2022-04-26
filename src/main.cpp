@@ -138,7 +138,7 @@ int main(int argc, char **argv) {
         }
 
         // Check for whether implemented every operation in Operations
-        assert(12 == Operations::OP_CNT && "Implement every operation" "parse_op_from_line");
+        assert(14 == Operations::OP_CNT && "Implement every operation" "parse_op_from_line");
         int col_start = i + 1;
         switch (line.at(i)) {
             case '+':
@@ -160,6 +160,15 @@ int main(int argc, char **argv) {
                 }
                 else {
                     op.op_type(Operations::OP_LESS_THAN);
+                }
+                break;
+            case '>':
+                if (i + 1 < line.size() && line.at(i + 1) == '=') {
+                    op.op_type(Operations::OP_GREATER_THAN_EQ);
+                    ++i;
+                }
+                else {
+                    op.op_type(Operations::OP_GREATER_THAN);
                 }
                 break;
             case 'i':
@@ -251,7 +260,7 @@ void simulate_program(std::string program_file_name,
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
     {
-        assert(12 == Operations::OP_CNT && "Implement every operation"
+        assert(14 == Operations::OP_CNT && "Implement every operation"
                 && "simulate_program()");
 
         switch (it->op_type()) {
@@ -351,6 +360,36 @@ void simulate_program(std::string program_file_name,
                 }
                 break;
 
+            case Operations::OP_GREATER_THAN:
+                if (program_stack.size() < 2) {
+                    print_error(program_file_name, it->line(), it->col(),
+                            "Not enough elements in stack for OP_GREATER_THAN operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    uint64_t a = program_stack.top();
+                    program_stack.pop();
+                    uint64_t b = program_stack.top();
+                    program_stack.pop();
+                    program_stack.push(b > a);
+                }
+                break;
+
+            case Operations::OP_GREATER_THAN_EQ:
+                if (program_stack.size() < 2) {
+                    print_error(program_file_name, it->line(), it->col(),
+                            "Not enough elements in stack for OP_GREATER_THAN operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    uint64_t a = program_stack.top();
+                    program_stack.pop();
+                    uint64_t b = program_stack.top();
+                    program_stack.pop();
+                    program_stack.push(b >= a);
+                }
+                break;
+
             case Operations::OP_DUP:
                 if (program_stack.size() < 1) {
                     print_error(program_file_name, it->line(), it->col(),
@@ -442,7 +481,7 @@ void compile_program(std::string output_filename, std::list<Operation> operation
     std::stack<uint64_t> conditional_stack;
 
     // Check for whether implemented every operation in Operations
-    assert(12 == Operations::OP_CNT && "Implement every operation"
+    assert(14 == Operations::OP_CNT && "Implement every operation"
             "compile_program");
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
@@ -573,6 +612,46 @@ void compile_program(std::string output_filename, std::list<Operation> operation
                     out_file << "    mov rdx, 1\n";
                     out_file << "    cmp rbx, rax\n";
                     out_file << "    cmovle rcx, rdx\n";
+                    out_file << "    push rcx\n";
+                    --mock_stack_size;
+                }
+                break;
+
+            case Operations::OP_GREATER_THAN:
+                if (mock_stack_size < 2) {
+                    print_error(output_filename, it->line(), it->col(),
+                            "Not enough elements in stack for OP_EQUALS(=) operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    out_file << "    ;; OP_EQUALS\n";
+                    out_file << "    pop rax\n";
+                    out_file << "    pop rbx\n";
+
+                    out_file << "    mov rcx, 0\n";
+                    out_file << "    mov rdx, 1\n";
+                    out_file << "    cmp rbx, rax\n";
+                    out_file << "    cmovg rcx, rdx\n";
+                    out_file << "    push rcx\n";
+                    --mock_stack_size;
+                }
+                break;
+
+            case Operations::OP_GREATER_THAN_EQ:
+                if (mock_stack_size < 2) {
+                    print_error(output_filename, it->line(), it->col(),
+                            "Not enough elements in stack for OP_EQUALS(=) operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    out_file << "    ;; OP_EQUALS\n";
+                    out_file << "    pop rax\n";
+                    out_file << "    pop rbx\n";
+
+                    out_file << "    mov rcx, 0\n";
+                    out_file << "    mov rdx, 1\n";
+                    out_file << "    cmp rbx, rax\n";
+                    out_file << "    cmovge rcx, rdx\n";
                     out_file << "    push rcx\n";
                     --mock_stack_size;
                 }
@@ -816,7 +895,7 @@ void crossreference_conditional(std::list<Operation>::iterator begin,
         std::list<Operation>::iterator end) {
     std::stack<Operation *> conditional_op;
     // Check for whether implemented conditional operation in Operations
-    assert(12 == Operations::OP_CNT && "Implement conditional operations" "crossreference_conditional");
+    assert(14 == Operations::OP_CNT && "Implement conditional operations" "crossreference_conditional");
     uint64_t ip = 0;
     for (auto it = begin; it != end; ++it, ++ip) {
         if (it->op_type() == Operations::OP_IF) {
