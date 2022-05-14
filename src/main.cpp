@@ -42,6 +42,7 @@ int main(int argc, char **argv) {
     // Two options: subcommand and file_path to compile
     std::string program_file_name = argv[2];
     std::list<Operation> operations = parse_program(program_file_name);
+    crossreference_conditional(operations);
 
     if (opt_command == STR_OPT_COMPILE) {
         compile_program(OUTPUT_FILENAME, operations);
@@ -252,11 +253,10 @@ int main(int argc, char **argv) {
 
 
 void simulate_program(std::string program_file_name,
-        std::list<Operation> operations_list) {
+        std::list<Operation> &operations_list) {
     std::cout << "Simulating\n";
     std::stack<uint64_t> program_stack;
 
-    crossreference_conditional(operations_list.begin(), operations_list.end());
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
     {
@@ -467,7 +467,7 @@ void print_usage(std::string program) {
 
 // Compiles the program and creates executable ./a.out and generated assembly
 // file %output_filename%.asm and relocatable %output_filename%.o
-void compile_program(std::string output_filename, std::list<Operation> operations_list) {
+void compile_program(std::string output_filename, std::list<Operation> &operations_list) {
     std::cout << "Compiling\n";
 
     int mock_stack_size = 0;
@@ -477,7 +477,6 @@ void compile_program(std::string output_filename, std::list<Operation> operation
 
     add_boilerplate_asm(out_file);
 
-    crossreference_conditional(operations_list.begin(), operations_list.end());
     std::stack<uint64_t> conditional_stack;
 
     // Check for whether implemented every operation in Operations
@@ -882,13 +881,12 @@ uint64_t while_loop_span(std::list<Operation>::iterator begin,
 
 
 // Adds where a conditional statement ends
-void crossreference_conditional(std::list<Operation>::iterator begin,
-        std::list<Operation>::iterator end) {
+void crossreference_conditional(std::list<Operation> &ops) {
     std::stack<Operation *> conditional_op;
     // Check for whether implemented conditional operation in Operations
     assert(14 == Operations::OP_CNT && "Implement conditional operations" "crossreference_conditional");
     uint64_t ip = 0;
-    for (auto it = begin; it != end; ++it, ++ip) {
+    for (auto it = ops.begin(); it != ops.end(); ++it, ++ip) {
         if (it->op_type() == Operations::OP_IF) {
             conditional_op.push(&(*it));
         }

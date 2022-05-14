@@ -91,11 +91,11 @@ class Operation {
 [[nodiscard]] std::list<Operation> parse_op_from_line(std::string line);
 [[maybe_unused]] size_t lstrip(std::string &str);
 void simulate_program(std::string program_file_name,
-        std::list<Operation> operations_list);
+        std::list<Operation> &operations_list);
+void compile_program(std::string output_filename,
+        std::list<Operation> &operations_list);
 void print_usage(std::string program);
 void print_help();
-void compile_program(std::string output_filename,
-        std::list<Operation> operations_list);
 void exec(const std::string cmd);
 int generate_asm_for_if_else(std::ofstream& out_file,
         std::list<Operation>::iterator begin,
@@ -104,7 +104,4 @@ int generate_asm_for_if_else(std::ofstream& out_file,
 void print_error(const std::string& program_file_name, const int line_num,
         const int col, const std::string msg);
 void add_boilerplate_asm(std::ofstream& out_file);
-uint64_t while_loop_span(std::list<Operation>::iterator begin,
-        std::list<Operation>::iterator end);
-void crossreference_conditional(std::list<Operation>::iterator begin,
-        std::list<Operation>::iterator end);
+void crossreference_conditional(std::list<Operation> &ops);
