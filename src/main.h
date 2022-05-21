@@ -1,4 +1,4 @@
-
+#pragma once
 
 #define MAX_KEYWORD_LEN 32
 #define TEST_PROGRAM "./examples/test.cl"
@@ -19,11 +19,13 @@ enum Operations {
     OP_LESS_THAN,
     OP_GREATER_THAN,
     OP_GREATER_THAN_EQ,
+    OP_DUP,
+    /* conditional */
     OP_IF,
     OP_ELSE,
     OP_END,
-    OP_DUP,
     OP_WHILE,
+    // end conditional
     OP_CNT, // This value is treated as UNKNOWN OPERATION
 };
 
@@ -74,7 +76,8 @@ class Operation {
         }
         uint64_t jump_loc() const {
             assert((op_type() == Operations::OP_IF ||
-                    op_type() == Operations::OP_ELSE)
+                    op_type() == Operations::OP_ELSE ||
+                    op_type() == Operations::OP_WHILE)
                   && "jump_loc should not be called with other operands");
             return m_jump_loc;
         }
@@ -89,19 +92,35 @@ class Operation {
 
 [[nodiscard]] std::list<Operation> parse_program(std::string program_file_name);
 [[nodiscard]] std::list<Operation> parse_op_from_line(std::string line);
-[[maybe_unused]] size_t lstrip(std::string &str);
+
+
 void simulate_program(std::string program_file_name,
         std::list<Operation> &operations_list);
+void crossreference_conditional(std::list<Operation> &ops);
+
+bool exec_compare_operation(Operations op_type, uint64_t a, uint64_t b);
+void exec_loop_in_simulation(std::list<Operation>::iterator begin,
+        uint64_t loop_inst_count, std::stack<uint64_t> &program_stack);
+void exec_non_conditional_op(Operation op, std::stack<uint64_t> &program_stack);
+void exec_conditional_op(std::list<Operation>::iterator cond_op_start,
+        std::list<Operation>::iterator cond_op_end,
+        std::stack<uint64_t> &program_stack);
+
+
 void compile_program(std::string output_filename,
         std::list<Operation> &operations_list);
-void print_usage(std::string program);
-void print_help();
-void exec(const std::string cmd);
+void add_boilerplate_asm(std::ofstream& out_file);
 int generate_asm_for_if_else(std::ofstream& out_file,
         std::list<Operation>::iterator begin,
         std::list<Operation>::iterator end,
         uint64_t ip);
+void exec(const std::string cmd);
+
+bool is_comparison_operation(Operations op_type);
+bool is_conditional_op(Operations op_type);
+
+void print_usage(std::string program);
+void print_help();
 void print_error(const std::string& program_file_name, const int line_num,
         const int col, const std::string msg);
-void add_boilerplate_asm(std::ofstream& out_file);
-void crossreference_conditional(std::list<Operation> &ops);
+[[maybe_unused]] size_t lstrip(std::string &str);

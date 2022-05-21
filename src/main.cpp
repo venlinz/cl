@@ -1,8 +1,12 @@
+// TODO: remove stub filenames
 #include <fstream>
 #include <iostream>
+#include <iterator>
 #include <list>
+#include <source_location>
 #include <stack>
 #include <string>
+#include <string_view>
 
 #include <cassert>
 #include <cstdint>
@@ -46,11 +50,9 @@ int main(int argc, char **argv) {
 
     if (opt_command == STR_OPT_COMPILE) {
         compile_program(OUTPUT_FILENAME, operations);
-        exit(0);
     }
     else if (opt_command == STR_OPT_SIMULATE) {
         simulate_program(program_file_name, operations);
-        exit(0);
     }
     else {
         std::cerr << "ERROR: Invalid command\n";
@@ -139,7 +141,8 @@ int main(int argc, char **argv) {
         }
 
         // Check for whether implemented every operation in Operations
-        assert(14 == Operations::OP_CNT && "Implement every operation" "parse_op_from_line");
+        assert(14 == Operations::OP_CNT && "Implement every operation" &&
+                "parse_op_from_line()");
         int col_start = i + 1;
         switch (line.at(i)) {
             case '+':
@@ -258,7 +261,9 @@ void simulate_program(std::string program_file_name,
     std::stack<uint64_t> program_stack;
 
     uint64_t ip = 0;
-    for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
+    for (auto it = operations_list.begin();
+            it != operations_list.end();
+            ++it, ++ip)
     {
         assert(14 == Operations::OP_CNT && "Implement every operation"
                 && "simulate_program()");
@@ -408,11 +413,13 @@ void simulate_program(std::string program_file_name,
                     exit(EXIT_FAILURE);
                 }
                 else {
-                    // if statement will not consume the bool_result
+                    // if statement will consume the bool_result
                     uint64_t bool_result = program_stack.top();
+                    program_stack.pop();
+
                     if (bool_result == 0) {
-                        auto ifp = it->jump_loc();
-                        while (ip != ifp) {
+                        uint64_t last_inst_ptr = it->jump_loc();
+                        while (ip != last_inst_ptr) {
                             ++ip;
                             ++it;
                         }
@@ -433,14 +440,26 @@ void simulate_program(std::string program_file_name,
                 break;
 
             case Operations::OP_WHILE:
-                assert(false && "Not implemented  while loop");
-                /* if (program_stack.size() < 1) { */
-                /*     print_error(program_file_name, it->line(), it->col(), */
-                /*             "Not enough elements in stack for OP_WHILE operation"); */
-                /*     exit(EXIT_FAILURE); */
-                /* } */
-                /* else { */
-                /* } */
+                if (program_stack.size() < 1) {
+                    print_error(program_file_name, it->line(), it->col(),
+                            "Not enough elements in stack for OP_WHILE operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    uint64_t bool_result = program_stack.top();
+                    program_stack.pop();
+                    uint64_t last_inst_ptr = it->jump_loc();
+
+                    if (bool_result != 0) {
+                        uint64_t inst_count_in_loop = last_inst_ptr - ip;
+                        exec_loop_in_simulation(it, inst_count_in_loop,
+                                program_stack);
+                    }
+                    while (last_inst_ptr != ip) {
+                        ++ip;
+                        ++it;
+                    }
+                }
                 break;
 
             default:
@@ -480,8 +499,8 @@ void compile_program(std::string output_filename, std::list<Operation> &operatio
     std::stack<uint64_t> conditional_stack;
 
     // Check for whether implemented every operation in Operations
-    assert(14 == Operations::OP_CNT && "Implement every operation"
-            "compile_program");
+    assert(14 == Operations::OP_CNT && "Implement every operation" &&
+            "compile_program()");
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
     {
@@ -884,10 +903,14 @@ uint64_t while_loop_span(std::list<Operation>::iterator begin,
 void crossreference_conditional(std::list<Operation> &ops) {
     std::stack<Operation *> conditional_op;
     // Check for whether implemented conditional operation in Operations
-    assert(14 == Operations::OP_CNT && "Implement conditional operations" "crossreference_conditional");
+    assert(14 == Operations::OP_CNT && "Implement conditional operations" &&
+            "crossreference_conditional()");
     uint64_t ip = 0;
     for (auto it = ops.begin(); it != ops.end(); ++it, ++ip) {
         if (it->op_type() == Operations::OP_IF) {
+            conditional_op.push(&(*it));
+        }
+        if (it->op_type() == Operations::OP_WHILE) {
             conditional_op.push(&(*it));
         }
         else if (it->op_type() == Operations::OP_END) {
@@ -911,5 +934,358 @@ void crossreference_conditional(std::list<Operation> &ops) {
                 std::cerr << "Operations on empty stack\n";
             }
         }
+    }
+}
+
+
+/*
+ * exec_loop_in_simulation() will simulate looping constructs
+ * {begin} - iterator pointing at OP_WHILE,
+ * {loop_inst_count} - number of instruction in looping constructs,
+ * NOTE: {loop_inst_count} is count between OP_WHILE to OP_END inclusive
+ * {&program_stack} - reference to program stack.
+ */
+void exec_loop_in_simulation(std::list<Operation>::iterator loop_begin,
+        uint64_t loop_inst_count, std::stack<uint64_t> &program_stack) {
+
+    auto condition_op = std::prev(loop_begin);
+    auto condition_r_value = std::prev(condition_op);
+
+    auto loop_body_end = loop_begin;
+    std::advance(loop_body_end, loop_inst_count);
+    do {
+        for (auto loop_body_start = std::next(loop_begin);
+                loop_body_start != loop_body_end; ++loop_body_start)
+        /* for (uint64_t ic = 0; ic < loop_inst_count; */
+        /*         ++ic, ++loop_body_start) */
+        {
+            if (!is_conditional_op(loop_body_start->op_type())) {
+                exec_non_conditional_op(*loop_body_start, program_stack);
+            }
+            else {
+                exec_conditional_op(loop_body_start, loop_body_end, program_stack);
+                while (loop_body_start->op_type() != Operations::OP_END) {
+                    ++loop_body_start;
+                }
+            }
+        }
+
+        if (!exec_compare_operation(condition_op->op_type(),
+                    condition_r_value->operand(), program_stack.top())) {
+            break;
+        }
+    } while (true);
+}
+
+
+bool is_comparison_operation(Operations op_type) {
+    return (op_type == Operations::OP_LESS_THAN ||
+            op_type == Operations::OP_LESS_THAN_EQ ||
+            op_type == Operations::OP_GREATER_THAN ||
+            op_type == Operations::OP_GREATER_THAN_EQ ||
+            op_type == Operations::OP_EQUALS);
+}
+
+
+void exec_non_conditional_op(Operation op, std::stack<uint64_t> &program_stack) {
+
+    assert(14 == Operations::OP_CNT && "Implement every operation" && 
+            "exec_non_conditional_op()");
+
+    std::string program_file_name = "stub.txt";
+    switch (op.op_type()) {
+        case Operations::OP_PUSH:
+            if (program_stack.size() >= MAX_STACK_SIZE) {
+                print_error(program_file_name, op.line(), op.col(),
+                        "Stack size exceeded limit");
+                exit(EXIT_FAILURE);
+            }
+            program_stack.push(op.operand());
+            break;
+
+        case Operations::OP_PLUS:
+            if (program_stack.size() >= 2) {
+                uint64_t a = program_stack.top();
+                program_stack.pop();
+                uint64_t b = program_stack.top();
+                program_stack.pop();
+                program_stack.push(a + b);
+            }
+            else {
+                print_error(program_file_name, op.line(), op.col(),
+                        "Not enough elements in stack for OP_PLUS(+) operation");
+                exit(EXIT_FAILURE);
+            }
+            break;
+
+        case Operations::OP_MINUS:
+            if (program_stack.size() >= 2) {
+                uint64_t a = program_stack.top();
+                program_stack.pop();
+                uint64_t b = program_stack.top();
+                program_stack.pop();
+                program_stack.push(b - a);
+            }
+            else {
+                print_error(program_file_name, op.line(), op.col(),
+                        "Not enough elements in stack for OP_MINUS(-) operation");
+                exit(EXIT_FAILURE);
+            }
+            break;
+
+        case Operations::OP_DUMP:
+            if (program_stack.size() < 1) {
+                print_error(program_file_name, op.line(), op.col(),
+                        "Not enough elements in stack for OP_DUMP operation");
+                exit(EXIT_FAILURE);
+            }
+            else {
+                std::cout << program_stack.top() << '\n';
+                program_stack.pop();
+            }
+            break;
+
+        case Operations::OP_EQUALS:
+            if (program_stack.size() < 2) {
+                print_error(program_file_name, op.line(), op.col(),
+                        "Not enough elements in stack for OP_EQUALS operation");
+                exit(EXIT_FAILURE);
+            }
+            else {
+                uint64_t a = program_stack.top();
+                program_stack.pop();
+                uint64_t b = program_stack.top();
+                program_stack.pop();
+                program_stack.push(a == b);
+            }
+            break;
+
+        case Operations::OP_LESS_THAN:
+            if (program_stack.size() < 2) {
+                print_error(program_file_name, op.line(), op.col(),
+                        "Not enough elements in stack for OP_LESS_THAN operation");
+                exit(EXIT_FAILURE);
+            }
+            else {
+                uint64_t a = program_stack.top();
+                program_stack.pop();
+                uint64_t b = program_stack.top();
+                program_stack.pop();
+                program_stack.push(b < a);
+            }
+            break;
+
+        case Operations::OP_LESS_THAN_EQ:
+            if (program_stack.size() < 2) {
+                print_error(program_file_name, op.line(), op.col(),
+                        "Not enough elements in stack for OP_LESS_THAN_EQ operation");
+                exit(EXIT_FAILURE);
+            }
+            else {
+                uint64_t a = program_stack.top();
+                program_stack.pop();
+                uint64_t b = program_stack.top();
+                program_stack.pop();
+                program_stack.push(b <= a);
+            }
+            break;
+
+        case Operations::OP_GREATER_THAN:
+            if (program_stack.size() < 2) {
+                print_error(program_file_name, op.line(), op.col(),
+                        "Not enough elements in stack for OP_GREATER_THAN operation");
+                exit(EXIT_FAILURE);
+            }
+            else {
+                uint64_t a = program_stack.top();
+                program_stack.pop();
+                uint64_t b = program_stack.top();
+                program_stack.pop();
+                program_stack.push(b > a);
+            }
+            break;
+
+        case Operations::OP_GREATER_THAN_EQ:
+            if (program_stack.size() < 2) {
+                print_error(program_file_name, op.line(), op.col(),
+                        "Not enough elements in stack for OP_GREATER_THAN operation");
+                exit(EXIT_FAILURE);
+            }
+            else {
+                uint64_t a = program_stack.top();
+                program_stack.pop();
+                uint64_t b = program_stack.top();
+                program_stack.pop();
+                program_stack.push(b >= a);
+            }
+            break;
+
+        case Operations::OP_DUP:
+            if (program_stack.size() < 1) {
+                print_error(program_file_name, op.line(), op.col(),
+                        "Not enough elements in stack for OP_DUMP operation");
+                exit(EXIT_FAILURE);
+            }
+            else {
+                program_stack.push(program_stack.top());
+            }
+            break;
+
+        case Operations::OP_IF:
+            assert(false && "Only for non conditional Operation");
+            break;
+
+        case Operations::OP_END:
+            /* assert(false && "Only for non conditional Operation"); */
+            // This Operation is handled outside the switch case.
+            break;
+
+        case Operations::OP_ELSE:
+            assert(false && "Only for non conditional Operation");
+            break;
+
+        case Operations::OP_WHILE:
+            assert(false && "Only for non conditional Operation");
+            break;
+
+        default:
+            print_error(program_file_name, op.line(), op.col(),
+                    "Operation unknown or conditional operation");
+            exit(EXIT_FAILURE);
+    }
+}
+
+
+bool exec_compare_operation(Operations op_type, uint64_t a, uint64_t b) {
+    if (!is_comparison_operation(op_type)) {
+        std::cerr << "ERROR: exec_compare_operation() invalid argument: not a comparison operation\n";
+        exit(EXIT_FAILURE);
+    }
+
+    switch (op_type) {
+        case Operations::OP_EQUALS:
+                return b == a;
+            break;
+
+        case Operations::OP_LESS_THAN:
+                return b < a;
+            break;
+
+        case Operations::OP_LESS_THAN_EQ:
+                return b <= a;
+            break;
+
+        case Operations::OP_GREATER_THAN:
+                return b > a;
+            break;
+
+        case Operations::OP_GREATER_THAN_EQ:
+                return b >= a;
+            break;
+        default:
+            assert(false && "Unrechable exec_compare_operation() switch");
+    }
+    assert(false && "Unrechable exec_compare_operation() end");
+    return false;
+}
+
+
+void exec_conditional_op(std::list<Operation>::iterator cond_op_start,
+        std::list<Operation>::iterator cond_op_end,
+        std::stack<uint64_t> &program_stack) {
+
+    assert(14 == Operations::OP_CNT && "Implement every operation" && 
+            "exec_conditional_op()");
+
+    uint64_t ip = 0;
+    std::string program_file_name = "stub.txt";
+    for (auto op = cond_op_start;
+            op != cond_op_end && op->op_type() != Operations::OP_END;
+            ++op) {
+        if (!is_conditional_op(op->op_type())) {
+            exec_non_conditional_op(*op, program_stack);
+            continue;
+        }
+        switch (op->op_type()) {
+            case Operations::OP_IF:
+                /* std::cerr << "exec_conditional_op() IF"; */
+                if (program_stack.size() < 1) {
+                    print_error(program_file_name, op->line(), op->col(),
+                            "Not enough elements in stack for OP_IF operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    // if statement will consume the bool_result
+                    uint64_t bool_result = program_stack.top();
+                    program_stack.pop();
+
+                    if (bool_result == 0) {
+                        uint64_t last_inst_ptr = op->jump_loc();
+                        while (ip != last_inst_ptr) {
+                            ++ip;
+                            ++op;
+                        }
+                    }
+                }
+                break;
+
+            case Operations::OP_END:
+                // This Operation is handled outside the switch case.
+                break;
+
+            case Operations::OP_ELSE:
+                std::cerr << "exec_conditional_op() ELSE";
+                while (op != cond_op_end &&
+                        op->op_type() != Operations::OP_END) {
+                    ++op;
+                    ++ip;
+                }
+                break;
+
+            case Operations::OP_WHILE:
+                std::cerr << "exec_conditional_op() WHILE";
+                assert(false && "exec_conditional_op() WHILE");
+                if (program_stack.size() < 1) {
+                    print_error(program_file_name, op->line(), op->col(),
+                            "Not enough elements in stack for OP_WHILE operation");
+                    exit(EXIT_FAILURE);
+                }
+                else {
+                    uint64_t bool_result = program_stack.top();
+                    program_stack.pop();
+                    uint64_t last_inst_ptr = op->jump_loc();
+
+                    if (bool_result != 0) {
+                        uint64_t inst_count_in_loop = last_inst_ptr - ip;
+                        exec_loop_in_simulation(op, inst_count_in_loop,
+                                program_stack);
+                    }
+                    while (last_inst_ptr != ip) {
+                        ++ip;
+                        ++op;
+                    }
+                }
+                break;
+
+            default:
+                print_error(program_file_name, op->line(), op->col(),
+                        "Operation unknown");
+                exit(EXIT_FAILURE);
+        }
+    }
+}
+
+
+bool is_conditional_op(Operations op_type) {
+    assert(14 == Operations::OP_CNT && "Implement every operation" &&
+            "is_conditional_op()");
+    switch (op_type) {
+        case Operations::OP_IF:
+        case Operations::OP_ELSE:
+        case Operations::OP_END:
+        case Operations::OP_WHILE:
+            return true;
+        default:
+            return false;
     }
 }
