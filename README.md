@@ -2,6 +2,8 @@
 
 c(oncatinative/++) l(anguage) - Concatinative stack based prgramming language written in C++
 it compiles down native executable and generates X86_64 assembly
+
+##note
 ! cl is work in progress language
 
 ## dependencies
