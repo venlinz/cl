@@ -755,41 +755,6 @@ void exec(const std::string cmd) {
 }
 
 
-int generate_asm_for_if_else(std::ofstream& out_file, std::list<Operation>::iterator begin,
-        std::list<Operation>::iterator end, uint64_t ip) {
-
-    assert(begin->op_type() == OP_IF && "Expects OP_IF only");
-
-    out_file << "    ;; OP_IF\n";
-    out_file << "    pop rax\n";
-    out_file << "    test rax, rax\n";
-    ++begin;
-
-    bool has_else_block = false;
-    while (begin != end) {
-        if (begin->op_type() == OP_END) {
-            break;
-        }
-        else if (begin->op_type() == OP_ELSE) {
-            out_file << "    jz branch" << ip << "else\n";
-            has_else_block = true;
-            break; // only supports if-else
-                   // does not support elifs
-                   // later I may remove this break
-        }
-        ++begin;
-    }
-
-    if (begin == end) {
-        return 1;
-    }
-    if (!has_else_block) {
-        out_file << "    jz branch" << ip << "\n";
-    }
-    return 0;
-}
-
-
 void print_error(const std::string& program_file_name, const int line_num,
         const int col, const std::string msg) {
     std::cerr << program_file_name << ':' << line_num << ':'
