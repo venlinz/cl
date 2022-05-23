@@ -8,8 +8,9 @@
 #define STR_KEYWORD_WHILE "while"
 #define STR_KEYWORD_ELSE "else"
 #define STR_KEYWORD_DUP "dup"
+#define STR_KEYWORD_DO "do"
 
-enum Operations {
+enum class Operations {
     OP_PUSH,
     OP_PLUS,
     OP_MINUS,
@@ -25,6 +26,7 @@ enum Operations {
     OP_ELSE,
     OP_END,
     OP_WHILE,
+    OP_DO,
     // end conditional
     OP_CNT, // This value is treated as UNKNOWN OPERATION
 };
@@ -32,7 +34,7 @@ enum Operations {
 
 class Operation {
     private:
-        Operations m_op = OP_CNT;
+        Operations m_op = Operations::OP_CNT;
         uint64_t m_opr = 0;
         int m_line = -1;
         int m_col = -1;
@@ -90,22 +92,13 @@ class Operation {
 
 #define OUTPUT_FILENAME "output"
 
-[[nodiscard]] std::list<Operation> parse_program(std::string program_file_name);
-[[nodiscard]] std::list<Operation> parse_op_from_line(std::string line);
+[[nodiscard("every op is needed")]] std::list<Operation> parse_program(std::string program_file_name);
+[[nodiscard("every op is needed")]] std::list<Operation> parse_op_from_line(std::string line);
 
 
 void simulate_program(std::string program_file_name,
         std::list<Operation> &operations_list);
 void crossreference_conditional(std::list<Operation> &ops);
-
-bool exec_compare_operation(Operations op_type, uint64_t a, uint64_t b);
-void exec_loop_in_simulation(std::list<Operation>::iterator begin,
-        uint64_t loop_inst_count, std::stack<uint64_t> &program_stack);
-void exec_non_conditional_op(Operation op, std::stack<uint64_t> &program_stack);
-void exec_conditional_op(std::list<Operation>::iterator cond_op_start,
-        std::list<Operation>::iterator cond_op_end,
-        std::stack<uint64_t> &program_stack);
-
 
 void compile_program(std::string output_filename,
         std::list<Operation> &operations_list);
