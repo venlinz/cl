@@ -116,6 +116,7 @@ int main(int argc, char **argv) {
     }
 
     std::list<Operation> line_ops = {};
+    bool is_comment = false;
     char number_str[32] = {0};
     for (uint32_t i = 0; i < line.size(); ++i) {
 
@@ -155,6 +156,9 @@ int main(int argc, char **argv) {
                 break;
             case '=':
                 op.op_type(Operations::OP_EQUALS);
+                break;
+            case '#':
+                is_comment = true;
                 break;
             case '<':
                 if (i + 1 < line.size() && line.at(i + 1) == '=') {
@@ -230,6 +234,11 @@ int main(int argc, char **argv) {
                 std::cerr << line.at(i) << '\n';
                 op.op_type(Operations::OP_CNT);
         }
+
+        if (is_comment) {
+            break;
+        }
+
         op.col(col_start);
         line_ops.push_back(op);
     }
