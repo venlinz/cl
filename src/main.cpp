@@ -1,4 +1,3 @@
-// TODO: remove stub filenames
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -427,10 +426,12 @@ void simulate_program(std::string program_file_name,
 
                     if (bool_result == 0) {
                         uint64_t last_inst_ptr = it->jump_loc();
-                        /* std::cerr << "last_inst_ptr if: " << last_inst_ptr << '\n'; */
                         while (ip != last_inst_ptr) {
                             ++ip;
                             ++it;
+                        }
+                        if (it->op_type() == Operations::OP_ELSE) {
+                            conditional_type_stack.push(it->op_type());
                         }
                         conditional_type_stack.pop();
                     }
@@ -478,7 +479,6 @@ void simulate_program(std::string program_file_name,
                 else {
                     conditional_type_stack.push(it->op_type());
                     while_jump_loc = it->jump_loc();
-                    /* std::cerr << "while_jump_loc: " << while_jump_loc << '\n'; */
                 }
                 break;
 
@@ -535,10 +535,11 @@ void compile_program(std::string output_filename, std::list<Operation> &operatio
     add_boilerplate_asm(out_file);
 
     std::stack<uint64_t> conditional_stack;
-    auto is_loop = false;
+    uint64_t while_jump_loc = 0;
+    uint64_t while_start_loc = 0;
 
     // Check for whether implemented every operation in Operations
-    assert(static_cast<Operations>(14) == Operations::OP_CNT && "Implement every operation" &&
+    assert(static_cast<Operations>(15) == Operations::OP_CNT && "Implement every operation" &&
             "compile_program()");
     uint64_t ip = 0;
     for (auto it = operations_list.begin(); it != operations_list.end(); ++it, ++ip)
@@ -644,7 +645,6 @@ void compile_program(std::string output_filename, std::list<Operation> &operatio
                 else {
                     out_file << "    ;; OP_LESS_THAN\n";
 
-                    out_file << "br10_loop:\n";
                     out_file << "    pop rax\n";
                     out_file << "    pop rbx\n";
 
@@ -739,9 +739,10 @@ void compile_program(std::string output_filename, std::list<Operation> &operatio
                     conditional_stack.pop();
                     out_file << "br" << conditional_stack.top() << "else:\n";
                 }
-                if (is_loop) {
-                    is_loop = false;
-                    out_file << "    jz br" << conditional_stack.top() << "_loop\n";
+                if (while_start_loc != 0) {
+                    out_file << "    jmp br" << while_start_loc << "_loop\n";
+                    out_file << "br" << while_jump_loc << "_loop:\n";
+                    while_start_loc = 0;
                 }
                 out_file << "br" << conditional_stack.top() << ":\n";
                 conditional_stack.pop();
@@ -761,15 +762,18 @@ void compile_program(std::string output_filename, std::list<Operation> &operatio
                     exit(EXIT_FAILURE);
                 }
                 else {
-                    out_file << "    ;; OP_WHILE\n";
-                    /* out_file << "br" << it->jump_loc() << "_loop:\n"; */
-                    out_file << "    pop rax\n";
-                    out_file << "    test rax, rax\n";
-                    is_loop = true;
+                    out_file << "\n    ;; OP_WHILE\n";
+                    out_file << "br" << ip << "_loop:\n";
                     conditional_stack.push(it->jump_loc());
-                    out_file << "    jz br" << it->jump_loc() << "\n";
+                    while_jump_loc = it->jump_loc();
+                    while_start_loc = ip;
                 }
-                /* assert(false && "Not implemented OP_WHILE for compilation mode"); */
+                break;
+
+            case Operations::OP_DO:
+                out_file << "    pop rax\n";
+                out_file << "    test rax, rax\n";
+                out_file << "    jz br" << while_jump_loc << "\n";
                 break;
 
             default:
